@@ -2,7 +2,7 @@
 //   DATABASE (localStorage)
 // ═══════════════════════════════════════════════
 const DB_KEY = "educore_db";
-const DB_VERSION = 3; // bump this whenever credential scheme changes
+const DB_VERSION = 4; // bumped: adds materials + subjects tables
 
 function getDB() {
   const raw = localStorage.getItem(DB_KEY);
@@ -455,7 +455,8 @@ const NAV_CONFIG = {
       section: "Academic",
       items: [
         { id: "attendance", label: "Attendance", icon: "📋" },
-        { id: "reports", label: "Reports", icon: "📊" },
+        { id: "classes",    label: "Class Materials", icon: "📂" },
+        { id: "reports",    label: "Reports", icon: "📊" },
       ],
     },
     {
@@ -468,9 +469,10 @@ const NAV_CONFIG = {
       section: "Main",
       items: [
         { id: "dashboard", label: "Dashboard", icon: "🏠" },
-        { id: "students", label: "Students", icon: "🎓" },
-        { id: "attendance", label: "Attendance", icon: "📋" },
-        { id: "reports", label: "Reports", icon: "📊" },
+        { id: "students",  label: "Students", icon: "🎓" },
+        { id: "attendance",label: "Attendance", icon: "📋" },
+        { id: "classes",   label: "Class Materials", icon: "📂" },
+        { id: "reports",   label: "Reports", icon: "📊" },
       ],
     },
     {
@@ -483,8 +485,9 @@ const NAV_CONFIG = {
       section: "Main",
       items: [
         { id: "dashboard", label: "Dashboard", icon: "🏠" },
-        { id: "fees", label: "My Fees", icon: "💰" },
-        { id: "attendance", label: "Attendance", icon: "📋" },
+        { id: "fees",      label: "My Fees", icon: "💰" },
+        { id: "attendance",label: "Attendance", icon: "📋" },
+        { id: "classes",   label: "Class Materials", icon: "📂" },
       ],
     },
     {
@@ -501,6 +504,8 @@ function initApp() {
   updateUserDisplay();
   updateRoleAccess();
   populateFilters();
+  initClassModule();    // class materials module
+  populateCMFilters();  // populate class/subject dropdowns in upload modal
   // Show dashboard directly and render it — no refresh needed
   showPage("dashboard");
 }
@@ -661,29 +666,28 @@ function showPage(pageId) {
   if (navItem) navItem.classList.add("active");
   document.getElementById("topbar-title").textContent =
     {
-      dashboard: "Dashboard",
-      students: "Students",
-      teachers: "Teachers",
-      fees: "Fee Management",
-      attendance: "Attendance",
-      reports: "Reports",
-      profile: "My Profile",
+      dashboard:     "Dashboard",
+      students:      "Students",
+      teachers:      "Teachers",
+      fees:          "Fee Management",
+      attendance:    "Attendance",
+      classes:       "Class Materials",
+      reports:       "Reports",
+      profile:       "My Profile",
       notifications: "Notifications",
     }[pageId] || pageId;
   currentPage = pageId;
   // Close mobile sidebar on navigation
   closeMobileSidebar();
-  if (pageId === "dashboard") renderDashboard();
-  if (pageId === "students") renderStudents();
-  if (pageId === "teachers") renderTeachers();
-  if (pageId === "fees") renderFees();
-  if (pageId === "attendance") {
-    resetAttTabs();
-    loadAttendanceForMark();
-  }
-  if (pageId === "reports") renderReport("summary");
+  if (pageId === "dashboard")  renderDashboard();
+  if (pageId === "students")   renderStudents();
+  if (pageId === "teachers")   renderTeachers();
+  if (pageId === "fees")       renderFees();
+  if (pageId === "attendance") { resetAttTabs(); loadAttendanceForMark(); }
+  if (pageId === "classes")    renderClassesPage();
+  if (pageId === "reports")    renderReport("summary");
   if (pageId === "notifications") renderNotifications();
-  if (pageId === "profile") renderProfile();
+  if (pageId === "profile")    renderProfile();
 }
 
 // ═══════════════════════════════════════════════
@@ -2189,22 +2193,11 @@ function renderPagination(key, total, current, pageSize) {
 }
 
 function changePage(key, page) {
-  if (key === "students") {
-    studentPage = page;
-    applyStudentFilters();
-  }
-  if (key === "teachers") {
-    teacherPage = page;
-    applyTeacherFilters();
-  }
-  if (key === "fees") {
-    feePage = page;
-    applyFeeFilters();
-  }
-  if (key === "att-rec") {
-    attRecPage = page;
-    filterAttRecords();
-  }
+  if (key === "students") { studentPage = page; applyStudentFilters(); }
+  if (key === "teachers") { teacherPage = page; applyTeacherFilters(); }
+  if (key === "fees")     { feePage = page;     applyFeeFilters();     }
+  if (key === "att-rec")  { attRecPage = page;  filterAttRecords();    }
+  if (key === "cm")       { cmState.page = page; renderMaterialsList(); }
 }
 
 // ═══════════════════════════════════════════════
@@ -2241,11 +2234,9 @@ function showConfirmModal(title, html, okLabel, onConfirm) {
   openModal("confirm-modal");
 }
 
-// Close modals on overlay click
-document.querySelectorAll(".modal-overlay").forEach((overlay) => {
-  overlay.addEventListener("click", function (e) {
-    if (e.target === this) closeModal(this.id);
-  });
+// Close modals on overlay click — delegated so it works for all modals including late-added ones
+document.addEventListener("click", function(e) {
+  if (e.target.classList.contains("modal-overlay")) closeModal(e.target.id);
 });
 
 // ═══════════════════════════════════════════════
@@ -2295,6 +2286,593 @@ window.addEventListener("resize", () => {
     if (currentPage === "dashboard") renderDashboard();
   }, 250);
 });
+
+// ═══════════════════════════════════════════════
+//   CLASS MANAGEMENT MODULE
+// ═══════════════════════════════════════════════
+
+const CM_TYPES = {
+  notes:      { label:"Notes",      icon:"📝", color:"#4f7cff", bg:"rgba(79,124,255,0.12)"  },
+  slides:     { label:"Slides",     icon:"📊", color:"#a855f7", bg:"rgba(168,85,247,0.12)"  },
+  assignment: { label:"Assignment", icon:"📋", color:"#f59e0b", bg:"rgba(245,158,11,0.12)"  },
+  video:      { label:"Video",      icon:"🎥", color:"#ef4444", bg:"rgba(239,68,68,0.12)"   },
+  reference:  { label:"Reference",  icon:"📚", color:"#14b8a6", bg:"rgba(20,184,166,0.12)"  },
+  other:      { label:"Other",      icon:"📎", color:"#8b91a8", bg:"rgba(139,145,168,0.12)" }
+};
+
+const CM_DEFAULT_SUBJECTS = [
+  "Mathematics","Physics","Chemistry","Biology","English",
+  "History","Geography","Computer Science","Art",
+  "Physical Education","Economics","Literature"
+];
+
+let cmState = { activeSubject:"all", view:"grid", page:1, pageSize:12, filtered:[] };
+let editMaterialId = null;
+let pendingFileData = null;
+
+/* ── DB helpers ── */
+function ensureCMTables() {
+  const db = getDB();
+  let changed = false;
+  if (!db.materials) { db.materials = []; changed = true; }
+  if (!db.subjects)  { db.subjects  = [...CM_DEFAULT_SUBJECTS]; changed = true; }
+  if (changed) { seedMaterials(db); saveDB(db); }
+  return db;
+}
+
+function offsetDate(days) {
+  const d = new Date(); d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+function cmSampleTags(subject) {
+  const map = {
+    Mathematics:["algebra","equations","exam-prep"], Physics:["mechanics","laws","kinematics"],
+    Chemistry:["periodic-table","organic","bonds"],   Biology:["cells","genetics","ecology"],
+    English:["writing","grammar","literature"],        History:["wwii","modern","sources"],
+    Geography:["climate","maps","human-geo"],          "Computer Science":["python","algorithms","data"],
+    Economics:["macro","gdp","markets"]
+  };
+  return (map[subject] || ["study","notes"]).join(",");
+}
+
+function seedMaterials(db) {
+  if (db.materials && db.materials.length) return;
+  db.materials = [];
+  const teachers = db.teachers || [];
+  if (!teachers.length) return;
+  const classes = db.classes || ["Class 9-A","Class 10-A","Class 11-A"];
+  const samples = [
+    { title:"Introduction to Algebra",          subject:"Mathematics",     type:"notes",      desc:"Covers variables, expressions, and basic equations for Class 9 students." },
+    { title:"Quadratic Equations — Chapter 5",  subject:"Mathematics",     type:"slides",     desc:"Full slide deck covering the quadratic formula, discriminant, and graphing parabolas." },
+    { title:"Algebra Practice Problems",        subject:"Mathematics",     type:"assignment", desc:"50 practice questions. Show all working.", due:offsetDate(7) },
+    { title:"Newton's Laws of Motion",          subject:"Physics",         type:"notes",      desc:"Detailed notes on all three Newton's laws with real-world examples." },
+    { title:"Khan Academy — Kinematics",        subject:"Physics",         type:"video",      desc:"Video series covering displacement, velocity, and acceleration.", url:"https://www.khanacademy.org/science/physics" },
+    { title:"Periodic Table Reference Sheet",   subject:"Chemistry",       type:"reference",  desc:"Full periodic table with atomic masses and electron configurations." },
+    { title:"Organic Chemistry — Hydrocarbons", subject:"Chemistry",       type:"notes",      desc:"Notes on alkanes, alkenes, alkynes and nomenclature." },
+    { title:"Cell Biology Study Guide",         subject:"Biology",         type:"notes",      desc:"Covers prokaryotic vs eukaryotic cells, organelles, and cell division." },
+    { title:"Essay Writing Workshop",           subject:"English",         type:"slides",     desc:"Structuring arguments, thesis statements, and conclusion writing." },
+    { title:"World War II — Causes & Effects",  subject:"History",         type:"notes",      desc:"Comprehensive notes on political, economic, and social causes of WWII." },
+    { title:"Python Basics — Lists & Loops",    subject:"Computer Science",type:"notes",      desc:"Introduction to Python lists, for-loops, while-loops with code examples." },
+    { title:"Midterm Assignment — CS",          subject:"Computer Science",type:"assignment", desc:"Build a simple student grade calculator in Python.", due:offsetDate(14) },
+    { title:"Climate Zones Map",                subject:"Geography",       type:"reference",  desc:"Colour-coded world map showing all major climate zones." },
+    { title:"Macroeconomics — GDP & Inflation", subject:"Economics",       type:"slides",     desc:"Slides covering national income, GDP calculation, and inflation." }
+  ];
+  samples.forEach((d, i) => {
+    const teacher = teachers[i % teachers.length];
+    const cls     = classes[i % Math.min(classes.length, 6)];
+    db.materials.push({
+      id:uid(), title:d.title, subject:d.subject, class:cls, type:d.type,
+      desc:d.desc||"", url:d.url||"", fileName:d.type!=="video"?`${d.title.replace(/\s+/g,"-").toLowerCase()}.pdf`:"",
+      fileSize:d.type!=="video"?`${(Math.random()*4+0.5).toFixed(1)} MB`:"",
+      fileData:"", tags:cmSampleTags(d.subject), visibility:"all",
+      teacherId:teacher.id, teacherName:`${teacher.firstName} ${teacher.lastName}`,
+      dueDate:d.due||"", uploadedAt:offsetDate(-(i*3)),
+      views:Math.floor(Math.random()*80)+5, downloads:Math.floor(Math.random()*40)+1
+    });
+  });
+}
+
+/* ── Init ── */
+function initClassModule() {
+  ensureCMTables();
+  updateRoleAccessCM();
+}
+
+function updateRoleAccessCM() {
+  const uploadBtn  = document.getElementById("btn-upload-material");
+  const subjectBtn = document.getElementById("btn-manage-subjects");
+  if (!uploadBtn || !subjectBtn) return;
+  const role = currentUser ? currentUser.role : "student";
+  uploadBtn.style.display  = role === "student" ? "none" : "";
+  subjectBtn.style.display = role === "admin"   ? ""     : "none";
+}
+
+function populateCMFilters() {
+  const db = ensureCMTables();
+  // cm-class-filter
+  const ccf = document.getElementById("cm-class-filter");
+  if (ccf) {
+    while (ccf.options.length > 1) ccf.remove(1);
+    (db.classes||[]).forEach(c => { const o=document.createElement("option");o.value=c;o.textContent=c;ccf.appendChild(o); });
+  }
+  // um-class
+  const umc = document.getElementById("um-class");
+  if (umc) {
+    while (umc.options.length > 1) umc.remove(1);
+    (db.classes||[]).forEach(c => { const o=document.createElement("option");o.value=c;o.textContent=c;umc.appendChild(o); });
+  }
+  populateSubjectSelect();
+}
+
+function populateSubjectSelect() {
+  const db  = ensureCMTables();
+  const sel = document.getElementById("um-subject");
+  if (!sel) return;
+  while (sel.options.length > 1) sel.remove(1);
+  (db.subjects || CM_DEFAULT_SUBJECTS).forEach(s => {
+    const o=document.createElement("option");o.value=s;o.textContent=s;sel.appendChild(o);
+  });
+}
+
+/* ── Render page ── */
+function renderClassesPage() {
+  const db = ensureCMTables();
+  updateRoleAccessCM();
+  renderCMStats(db);
+  renderSubjectTabs(db);
+  filterMaterials();
+  const el = document.getElementById("classes-subtitle");
+  if (!el) return;
+  const role = currentUser ? currentUser.role : "";
+  if (role === "teacher") {
+    const mine = (db.materials||[]).filter(m => m.teacherId === currentUser.id);
+    el.textContent = `You have uploaded ${mine.length} material${mine.length!==1?"s":""}`;
+  } else if (role === "student") {
+    el.textContent = "Browse notes, slides, and resources shared by your teachers";
+  } else {
+    el.textContent = `${(db.materials||[]).length} materials across ${(db.subjects||[]).length} subjects`;
+  }
+}
+
+function renderCMStats(db) {
+  const el = document.getElementById("cm-stats-row");
+  if (!el) return;
+  const visible  = getVisibleMaterials(db);
+  const subjects = [...new Set(visible.map(m => m.subject))].length;
+  const notes    = visible.filter(m => m.type === "notes").length;
+  const today    = new Date().toISOString().split("T")[0];
+  const due      = visible.filter(m => m.type === "assignment" && m.dueDate && m.dueDate >= today).length;
+  el.innerHTML = `
+    <div class="cm-stat"><div class="cm-stat-icon" style="background:var(--accent-glow)">📂</div>
+      <div><div class="cm-stat-val">${visible.length}</div><div class="cm-stat-label">Total Materials</div></div></div>
+    <div class="cm-stat"><div class="cm-stat-icon" style="background:var(--purple-bg)">📚</div>
+      <div><div class="cm-stat-val">${subjects}</div><div class="cm-stat-label">Subjects</div></div></div>
+    <div class="cm-stat"><div class="cm-stat-icon" style="background:var(--green-bg)">📝</div>
+      <div><div class="cm-stat-val">${notes}</div><div class="cm-stat-label">Notes</div></div></div>
+    <div class="cm-stat"><div class="cm-stat-icon" style="background:var(--amber-bg)">⏰</div>
+      <div><div class="cm-stat-val">${due}</div><div class="cm-stat-label">Pending Assignments</div></div></div>`;
+}
+
+function renderSubjectTabs(db) {
+  const el = document.getElementById("cm-subject-tabs");
+  if (!el) return;
+  const visible  = getVisibleMaterials(db);
+  const subjects = [...new Set(visible.map(m => m.subject))].sort();
+  let html = `<div class="cm-subject-tab ${cmState.activeSubject==="all"?"active":""}" data-subject="all">All <span class="cm-tab-count">${visible.length}</span></div>`;
+  subjects.forEach(s => {
+    const count  = visible.filter(m => m.subject === s).length;
+    const active = cmState.activeSubject === s ? "active" : "";
+    html += `<div class="cm-subject-tab ${active}" data-subject="${cmEsc(s)}">${cmEsc(s)} <span class="cm-tab-count">${count}</span></div>`;
+  });
+  el.innerHTML = html;
+  // Attach click handlers via JS — avoids any quoting issues with subject names
+  el.querySelectorAll(".cm-subject-tab").forEach(tab => {
+    tab.addEventListener("click", () => setActiveSubject(tab.dataset.subject));
+  });
+}
+
+function setActiveSubject(sub) {
+  cmState.activeSubject = sub;
+  cmState.page = 1;
+  document.querySelectorAll(".cm-subject-tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.subject === sub);
+  });
+  filterMaterials();
+}
+
+function getVisibleMaterials(db) {
+  const mats = db.materials || [];
+  if (!currentUser) return mats;
+  if (currentUser.role === "admin" || currentUser.role === "teacher") return mats;
+  // Students see visibility=all OR their own class
+  return mats.filter(m => m.visibility==="all" || m.class===currentUser.class);
+}
+
+function filterMaterials() {
+  const db     = ensureCMTables();
+  const search = (document.getElementById("cm-search-input")?.value||"").toLowerCase();
+  const type   = document.getElementById("cm-type-filter")?.value||"";
+  const cls    = document.getElementById("cm-class-filter")?.value||"";
+  let list     = getVisibleMaterials(db);
+  if (cmState.activeSubject !== "all") list = list.filter(m => m.subject===cmState.activeSubject);
+  if (type)   list = list.filter(m => m.type===type);
+  if (cls)    list = list.filter(m => m.class===cls);
+  if (search) list = list.filter(m =>
+    m.title.toLowerCase().includes(search) || m.subject.toLowerCase().includes(search) ||
+    m.desc.toLowerCase().includes(search)  || (m.tags||"").toLowerCase().includes(search));
+  list = list.slice().sort((a,b) => (b.uploadedAt||"").localeCompare(a.uploadedAt||""));
+  cmState.filtered = list;
+  cmState.page = Math.min(cmState.page, Math.ceil(list.length/cmState.pageSize)||1);
+  renderMaterialsList();
+}
+
+function renderMaterialsList() {
+  const container = document.getElementById("cm-materials-container");
+  if (!container) return;
+  const { filtered, page, pageSize, view } = cmState;
+  const start = (page-1)*pageSize;
+  const items = filtered.slice(start, start+pageSize);
+  if (!filtered.length) {
+    container.innerHTML = `<div class="cm-empty"><div class="cm-empty-icon">📂</div><h3>No materials found</h3><p>Try adjusting your filters${currentUser?.role!=="student"?", or upload the first material!":"."}</p></div>`;
+    renderPagination("cm", 0, page, pageSize);
+    return;
+  }
+  container.innerHTML = view==="grid"
+    ? `<div class="cm-grid">${items.map(renderMaterialCard).join("")}</div>`
+    : `<div class="cm-list">${items.map(renderMaterialListItem).join("")}</div>`;
+  renderPagination("cm", filtered.length, page, pageSize);
+}
+
+function getCMDueBadge(m) {
+  if (m.type!=="assignment"||!m.dueDate) return "";
+  const today   = new Date().toISOString().split("T")[0];
+  const overdue = m.dueDate < today;
+  const days    = Math.ceil((new Date(m.dueDate)-new Date())/86400000);
+  const label   = overdue?"Overdue":days===0?"Due Today":`Due in ${days}d`;
+  return `<span class="cm-due-badge ${overdue?"overdue":""}">⏰ ${label}</span>`;
+}
+
+function renderMaterialCard(m) {
+  const t       = CM_TYPES[m.type]||CM_TYPES.other;
+  const tags    = (m.tags||"").split(",").map(s=>s.trim()).filter(Boolean).slice(0,3);
+  const canEdit = currentUser?.role==="admin"||(currentUser?.role==="teacher"&&m.teacherId===currentUser?.id);
+  const dueB    = getCMDueBadge(m);
+  return `<div class="cm-card" onclick="viewMaterial('${m.id}')">
+    <div class="cm-card-strip" style="background:${t.color}"></div>
+    <div class="cm-card-body">
+      <div class="cm-card-top">
+        <div class="cm-type-icon" style="background:${t.bg};color:${t.color}">${t.icon}</div>
+        <div>
+          <div class="cm-card-title">${cmEsc(m.title)}</div>
+          <div style="margin-top:4px;">
+            <span class="badge badge-blue" style="font-size:10px;">${cmEsc(m.subject)}</span>
+            &nbsp;<span style="font-size:10px;color:var(--text3);">${cmEsc(m.class)}</span>
+          </div>
+        </div>
+      </div>
+      ${m.desc?`<div class="cm-card-desc">${cmEsc(m.desc)}</div>`:""}
+      <div class="cm-card-meta">
+        <div class="cm-card-tags">${tags.map(tag=>`<span class="cm-tag">${cmEsc(tag)}</span>`).join("")}</div>
+        ${dueB}
+      </div>
+    </div>
+    <div class="cm-card-footer">
+      <div class="cm-uploader">
+        <div class="cm-uploader-avatar">${(m.teacherName||"?").charAt(0)}</div>
+        <span>${cmEsc((m.teacherName||"Unknown").split(" ")[0])}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="cm-date">${cmFmtDate(m.uploadedAt)}</span>
+        <div onclick="event.stopPropagation()" style="display:flex;gap:4px;">
+          ${canEdit?`<button class="btn btn-ghost btn-sm" onclick="openUploadModal('${m.id}')">✏</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteMaterial('${m.id}')">🗑</button>`:""}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderMaterialListItem(m) {
+  const t       = CM_TYPES[m.type]||CM_TYPES.other;
+  const canEdit = currentUser?.role==="admin"||(currentUser?.role==="teacher"&&m.teacherId===currentUser?.id);
+  const dueB    = getCMDueBadge(m);
+  return `<div class="cm-list-item" onclick="viewMaterial('${m.id}')">
+    <div class="cm-list-icon" style="background:${t.bg};color:${t.color}">${t.icon}</div>
+    <div class="cm-list-info">
+      <div class="cm-list-title">${cmEsc(m.title)}</div>
+      <div class="cm-list-sub">${cmEsc(m.subject)} · ${cmEsc(m.class)} · ${cmEsc(m.teacherName||"Unknown")} · ${cmFmtDate(m.uploadedAt)}</div>
+    </div>
+    <div class="cm-list-right">
+      ${dueB}
+      <span class="badge badge-blue" style="font-size:10px;">${t.label}</span>
+      ${canEdit?`<div onclick="event.stopPropagation()" style="display:flex;gap:4px;">
+        <button class="btn btn-ghost btn-sm" onclick="openUploadModal('${m.id}')">✏</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMaterial('${m.id}')">🗑</button>
+      </div>`:""}
+    </div>
+  </div>`;
+}
+
+function setCMView(v, btn) {
+  cmState.view = v;
+  document.querySelectorAll(".cm-view-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderMaterialsList();
+}
+
+/* ── Upload / Edit modal ── */
+function openUploadModal(id) {
+  if (!currentUser || currentUser.role === "student") { showToast("Students cannot upload materials","error"); return; }
+  editMaterialId = id || null;
+  pendingFileData = null;
+  document.getElementById("upload-modal-title").textContent = id ? "Edit Material" : "Upload Material";
+  document.getElementById("upload-btn-text").textContent    = id ? "Save Changes"  : "Upload Material";
+  const hint = document.getElementById("upload-teacher-hint");
+  const name = document.getElementById("upload-teacher-name");
+  if (currentUser.role === "teacher") { hint.style.display=""; name.textContent=currentUser.name; }
+  else hint.style.display = "none";
+  resetDropzone();
+  ["um-title-err","um-subject-err","um-class-err","um-url-err"].forEach(i => { const e=document.getElementById(i);if(e)e.textContent=""; });
+  if (id) {
+    const db = ensureCMTables();
+    const m  = db.materials.find(x => x.id===id);
+    if (!m) return;
+    document.getElementById("um-title").value      = m.title||"";
+    document.getElementById("um-subject").value    = m.subject||"";
+    document.getElementById("um-class").value      = m.class||"";
+    document.getElementById("um-type").value       = m.type||"notes";
+    document.getElementById("um-visibility").value = m.visibility||"all";
+    document.getElementById("um-desc").value       = m.desc||"";
+    document.getElementById("um-due").value        = m.dueDate||"";
+    document.getElementById("um-tags").value       = m.tags||"";
+    document.getElementById("um-url").value        = m.url||"";
+    if (m.fileName) document.getElementById("cm-dropzone-sub").textContent = `Current: ${m.fileName}`;
+    toggleUrlField(m.type);
+  } else {
+    ["um-title","um-desc","um-due","um-tags","um-url"].forEach(i => { const e=document.getElementById(i);if(e)e.value=""; });
+    document.getElementById("um-type").value       = "notes";
+    document.getElementById("um-visibility").value = "all";
+    document.getElementById("um-subject").value    = "";
+    document.getElementById("um-class").value      = "";
+    toggleUrlField("notes");
+  }
+  document.getElementById("um-type").onchange = function() { toggleUrlField(this.value); };
+  openModal("upload-modal");
+}
+
+function toggleUrlField(type) {
+  const fg = document.getElementById("um-file-group");
+  const ug = document.getElementById("um-url-group");
+  if (!fg||!ug) return;
+  fg.style.display = type==="video" ? "none" : "";
+  ug.style.display = type==="video" ? ""     : "none";
+}
+
+function saveMaterial() {
+  ["um-title-err","um-subject-err","um-class-err","um-url-err"].forEach(i => { const e=document.getElementById(i);if(e)e.textContent=""; });
+  const title   = document.getElementById("um-title").value.trim();
+  const subject = document.getElementById("um-subject").value;
+  const cls     = document.getElementById("um-class").value;
+  const type    = document.getElementById("um-type").value;
+  const url     = document.getElementById("um-url").value.trim();
+  let valid = true;
+  if (!title)   { document.getElementById("um-title-err").textContent   = "Required"; valid=false; }
+  if (!subject) { document.getElementById("um-subject-err").textContent = "Required"; valid=false; }
+  if (!cls)     { document.getElementById("um-class-err").textContent   = "Required"; valid=false; }
+  if (type==="video"&&!url) { document.getElementById("um-url-err").textContent = "URL required"; valid=false; }
+  if (!valid) return;
+  const db   = ensureCMTables();
+  const data = {
+    title, subject, class:cls, type,
+    visibility: document.getElementById("um-visibility").value,
+    desc:       document.getElementById("um-desc").value.trim(),
+    dueDate:    document.getElementById("um-due").value,
+    tags:       document.getElementById("um-tags").value.trim(),
+    url:        type==="video" ? url : ""
+  };
+  if (pendingFileData) {
+    data.fileName = pendingFileData.name;
+    data.fileSize = cmFmtBytes(pendingFileData.size);
+    data.fileData = pendingFileData.dataUrl;
+  }
+  if (editMaterialId) {
+    const idx = db.materials.findIndex(m => m.id===editMaterialId);
+    if (idx>-1) db.materials[idx] = { ...db.materials[idx], ...data };
+    logActivity(`Material "${title}" updated`, "var(--accent)");
+    showToast("Material updated successfully","success");
+  } else {
+    db.materials.push({
+      id:uid(), teacherId:currentUser.id||currentUser.teacherId||"admin",
+      teacherName:currentUser.name, uploadedAt:new Date().toISOString().split("T")[0],
+      views:0, downloads:0, fileName:"", fileSize:"", fileData:"", ...data
+    });
+    logActivity(`New material "${title}" uploaded by ${currentUser.name}`, "var(--green)");
+    showToast("Material uploaded successfully! 🎉","success");
+  }
+  saveDB(db);
+  closeModal("upload-modal");
+  renderClassesPage();
+  pendingFileData = null;
+}
+
+function deleteMaterial(id) {
+  const db = ensureCMTables();
+  const m  = db.materials.find(x => x.id===id);
+  if (!m) return;
+  showConfirm(`Delete "${m.title}"? This cannot be undone.`, () => {
+    const db2 = ensureCMTables();
+    db2.materials = db2.materials.filter(x => x.id!==id);
+    saveDB(db2); renderClassesPage();
+    showToast("Material deleted","info");
+  });
+}
+
+/* ── Detail modal ── */
+function viewMaterial(id) {
+  const db  = ensureCMTables();
+  const idx = db.materials.findIndex(x => x.id===id);
+  if (idx===-1) return;
+  db.materials[idx].views = (db.materials[idx].views||0)+1;
+  saveDB(db);
+  const m       = db.materials[idx];
+  const t       = CM_TYPES[m.type]||CM_TYPES.other;
+  const tags    = (m.tags||"").split(",").map(s=>s.trim()).filter(Boolean);
+  const canEdit = currentUser?.role==="admin"||(currentUser?.role==="teacher"&&m.teacherId===currentUser?.id);
+  const hasFile = !!m.fileData;
+  const isVideo = m.type==="video"&&m.url;
+  const dueB    = getCMDueBadge(m);
+  document.getElementById("md-title").textContent = m.title;
+  document.getElementById("md-body").innerHTML = `
+    <div class="md-hero">
+      <div class="md-hero-icon" style="background:${t.bg};color:${t.color}">${t.icon}</div>
+      <div>
+        <div class="md-hero-title">${cmEsc(m.title)}</div>
+        <div class="md-hero-sub">
+          <span class="badge badge-blue" style="margin-right:6px;">${cmEsc(m.subject)}</span>
+          <span style="font-size:11px;color:var(--text3);">${t.label} · ${cmEsc(m.class)}</span>
+        </div>
+        ${dueB?`<div style="margin-top:8px;">${dueB}</div>`:""}
+      </div>
+    </div>
+    <div class="md-fields">
+      <div class="md-field"><label>Uploaded By</label><span>${cmEsc(m.teacherName||"Unknown")}</span></div>
+      <div class="md-field"><label>Date</label><span>${cmFmtDate(m.uploadedAt)}</span></div>
+      <div class="md-field"><label>Class</label><span>${cmEsc(m.class)}</span></div>
+      <div class="md-field"><label>Visibility</label><span>${m.visibility==="all"?"🌍 All Students":"🏫 This Class Only"}</span></div>
+      ${m.fileName?`<div class="md-field"><label>File</label><span>📄 ${cmEsc(m.fileName)}</span></div>`:""}
+      ${m.fileSize?`<div class="md-field"><label>Size</label><span>${cmEsc(m.fileSize)}</span></div>`:""}
+      ${m.dueDate ?`<div class="md-field"><label>Due Date</label><span>${m.dueDate}</span></div>`:""}
+    </div>
+    ${m.desc?`<div class="md-desc-block">${cmEsc(m.desc)}</div>`:""}
+    ${tags.length?`<div class="md-tags-row">${tags.map(tag=>`<span class="cm-tag">${cmEsc(tag)}</span>`).join("")}</div>`:""}
+    ${isVideo?`<a href="${cmEsc(m.url)}" target="_blank" rel="noopener" class="md-download-btn" onclick="cmRecordDownload('${m.id}')">🎥 Open Video Link</a>`:""}
+    ${hasFile?`<button class="md-download-btn" onclick="downloadMaterial('${m.id}')">⬇ Download ${cmEsc(m.fileName||"File")} ${m.fileSize?"("+m.fileSize+")":""}</button>`:""}
+    ${!hasFile&&!isVideo?`<div style="background:var(--bg3);border-radius:var(--radius);padding:14px;text-align:center;color:var(--text3);font-size:13px;margin-bottom:12px;">📎 No file attached (demo material)</div>`:""}
+    <div class="md-views-row">
+      <span>👁 ${m.views||1} views</span>
+      <span>⬇ ${m.downloads||0} downloads</span>
+      <span>📅 ${cmFmtDate(m.uploadedAt)}</span>
+    </div>`;
+  document.getElementById("md-footer").innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal('material-detail-modal')">Close</button>
+    ${canEdit?`<button class="btn btn-ghost" onclick="closeModal('material-detail-modal');openUploadModal('${m.id}')">✏ Edit</button>
+    <button class="btn btn-danger" onclick="closeModal('material-detail-modal');deleteMaterial('${m.id}')">🗑 Delete</button>`:""}
+    ${hasFile?`<button class="btn btn-accent" onclick="downloadMaterial('${m.id}')">⬇ Download</button>`:""}
+    ${isVideo?`<a href="${cmEsc(m.url)}" target="_blank" rel="noopener" class="btn btn-accent" onclick="cmRecordDownload('${m.id}')">🎥 Open Link</a>`:""}`;
+  openModal("material-detail-modal");
+}
+
+function downloadMaterial(id) {
+  const db  = ensureCMTables();
+  const idx = db.materials.findIndex(x => x.id===id);
+  if (idx===-1) return;
+  db.materials[idx].downloads = (db.materials[idx].downloads||0)+1;
+  saveDB(db);
+  if (db.materials[idx].fileData) {
+    const a = document.createElement("a");
+    a.href = db.materials[idx].fileData;
+    a.download = db.materials[idx].fileName||"material";
+    a.click();
+    showToast(`Downloading ${db.materials[idx].fileName}`,"success");
+  } else {
+    showToast("Demo materials don't have real files attached","info");
+  }
+}
+
+function cmRecordDownload(id) {
+  const db=ensureCMTables();
+  const idx=db.materials.findIndex(x=>x.id===id);
+  if(idx>-1){db.materials[idx].downloads=(db.materials[idx].downloads||0)+1;saveDB(db);}
+}
+
+/* ── File handling ── */
+function handleFileSelect(input) {
+  if (input.files && input.files[0]) cmProcessFile(input.files[0]);
+}
+function handleFileDrop(event) {
+  event.preventDefault();
+  document.getElementById("cm-dropzone").classList.remove("drag-over");
+  if (event.dataTransfer.files[0]) cmProcessFile(event.dataTransfer.files[0]);
+}
+function cmProcessFile(file) {
+  if (file.size > 10*1024*1024) { showToast("File too large. Max 10MB.","error"); return; }
+  const dz = document.getElementById("cm-dropzone");
+  dz.classList.add("has-file");
+  document.getElementById("cm-dropzone-sub").textContent = `✓ ${file.name} (${cmFmtBytes(file.size)})`;
+  const reader = new FileReader();
+  reader.onload = e => {
+    pendingFileData = { name:file.name, size:file.size, type:file.type, dataUrl:e.target.result };
+    showToast(`"${file.name}" ready to upload`,"success");
+  };
+  reader.readAsDataURL(file);
+}
+function resetDropzone() {
+  const dz = document.getElementById("cm-dropzone");
+  const fi = document.getElementById("um-file-input");
+  if (dz) dz.classList.remove("has-file","drag-over");
+  const sub = document.getElementById("cm-dropzone-sub");
+  if (sub) sub.textContent = "Supports PDF, DOCX, PPTX, PNG, JPG";
+  if (fi) fi.value = "";
+  pendingFileData = null;
+}
+
+/* ── Manage subjects ── */
+function openManageSubjectsModal() {
+  if (currentUser?.role !== "admin") { showToast("Only admins can manage subjects","error"); return; }
+  renderSubjectsList();
+  openModal("manage-subjects-modal");
+}
+function renderSubjectsList() {
+  const db = ensureCMTables();
+  const el = document.getElementById("subjects-list");
+  if (!el) return;
+  el.innerHTML = (db.subjects||[]).map((s,i) => {
+    const count = (db.materials||[]).filter(m=>m.subject===s).length;
+    return `<div class="subject-manage-item">
+      <div class="subject-manage-name"><span>${cmEsc(s)}</span><span class="subject-manage-count">${count} material${count!==1?"s":""}</span></div>
+      <button class="btn btn-danger btn-sm" onclick="removeSubject(${i})">Remove</button>
+    </div>`;
+  }).join("")||`<p style="color:var(--text3);font-size:13px;text-align:center;padding:16px;">No subjects yet.</p>`;
+}
+function addSubject() {
+  const input = document.getElementById("new-subject-input");
+  const name  = input.value.trim();
+  if (!name) return;
+  const db = ensureCMTables();
+  if ((db.subjects||[]).map(s=>s.toLowerCase()).includes(name.toLowerCase())) { showToast("Subject already exists","error"); return; }
+  db.subjects = db.subjects||[];
+  db.subjects.push(name);
+  saveDB(db); input.value="";
+  renderSubjectsList(); populateSubjectSelect();
+  const db2 = ensureCMTables(); renderSubjectTabs(db2);
+  showToast(`Subject "${name}" added`,"success");
+}
+function removeSubject(idx) {
+  const db   = ensureCMTables();
+  const name = db.subjects[idx];
+  db.subjects.splice(idx, 1);
+  saveDB(db); renderSubjectsList(); populateSubjectSelect();
+  const db2 = ensureCMTables(); renderSubjectTabs(db2);
+  showToast(`Subject "${name}" removed`,"info");
+}
+
+/* ── Utilities ── */
+function cmEsc(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function cmFmtDate(str) {
+  if (!str) return "—";
+  try { return new Date(str).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"}); }
+  catch { return str; }
+}
+function cmFmtBytes(bytes) {
+  if (!bytes) return "0 B";
+  const k=1024, s=["B","KB","MB","GB"];
+  const i=Math.floor(Math.log(bytes)/Math.log(k));
+  return parseFloat((bytes/Math.pow(k,i)).toFixed(1))+" "+s[i];
+}
 
 // ═══════════════════════════════════════════════
 //   BOOT
