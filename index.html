@@ -260,7 +260,10 @@
         </div>
 
         <div id="att-records-section" style="display:none;">
-          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <div id="att-student-notice" style="display:none;" class="info-banner" style="margin-bottom:14px;">
+            👤 Showing your personal attendance records only
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;" id="att-rec-filters">
             <div class="search-input" style="flex:1;min-width:160px;"><span>🔍</span><input placeholder="Search student..." id="att-rec-search" oninput="filterAttRecords()" style="width:100%;"></div>
             <input type="date" id="att-rec-date" onchange="filterAttRecords()"
               style="background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;color:var(--text);font-size:13px;">

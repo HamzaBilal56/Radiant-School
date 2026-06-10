@@ -551,16 +551,24 @@ function updateUserDisplay() {
 }
 
 function updateRoleAccess() {
-  const isAdmin = currentUser.role === "admin";
+  const isAdmin   = currentUser.role === "admin";
   const isTeacher = currentUser.role === "teacher";
-  const el = (id) => {
-    const e = document.getElementById(id);
-    if (e) return e;
-  };
+  const isStudent = currentUser.role === "student";
+  const el = (id) => document.getElementById(id);
+
+  // Admin-only buttons
   if (!isAdmin) {
     el("btn-add-student") && (el("btn-add-student").style.display = "none");
     el("btn-add-teacher") && (el("btn-add-teacher").style.display = "none");
-    el("btn-add-fee") && (el("btn-add-fee").style.display = "none");
+    el("btn-add-fee")     && (el("btn-add-fee").style.display     = "none");
+  }
+
+  // Students cannot mark attendance — hide save button and mark tab
+  if (isStudent) {
+    el("btn-save-att")  && (el("btn-save-att").style.display  = "none");
+    // Hide the "Mark Attendance" tab entirely for students
+    const markTab = document.querySelector("#att-tabs .tab:first-child");
+    if (markTab) markTab.style.display = "none";
   }
 }
 
@@ -685,7 +693,13 @@ function showPage(pageId) {
   if (pageId === "fees")       renderFees();
   if (pageId === "attendance") { resetAttTabs(); loadAttendanceForMark(); }
   if (pageId === "classes")    renderClassesPage();
-  if (pageId === "reports")    renderReport("summary");
+  if (pageId === "reports") {
+    // Reset filters/pagination so every visit starts fresh
+    reportState.students   = { page:1, pageSize:15, search:"", classFilter:"", statusFilter:"" };
+    reportState.attendance = { page:1, pageSize:15, search:"", classFilter:"", rateFilter:""   };
+    reportState.summary    = { page:1, pageSize:16 };
+    renderReport("summary");
+  }
   if (pageId === "notifications") renderNotifications();
   if (pageId === "profile")    renderProfile();
 }
@@ -1677,31 +1691,50 @@ function printReceipt() {
 let currentAttStatus = {};
 
 function resetAttTabs() {
-  // Reset to "Mark Attendance" tab whenever attendance page is opened
-  document
-    .querySelectorAll("#att-tabs .tab")
-    .forEach((t, i) => t.classList.toggle("active", i === 0));
-  document.getElementById("att-mark-section").style.display = "block";
-  document.getElementById("att-records-section").style.display = "none";
-  document.getElementById("att-report-section").style.display = "none";
-  document.getElementById("btn-save-att").style.display = "";
+  const isStudent = currentUser && currentUser.role === "student";
+
+  if (isStudent) {
+    // Students land on Records tab — they can only view, not mark
+    document.querySelectorAll("#att-tabs .tab").forEach((t, i) => {
+      t.classList.toggle("active", i === 1); // Records is index 1
+    });
+    document.getElementById("att-mark-section").style.display    = "none";
+    document.getElementById("att-records-section").style.display = "block";
+    document.getElementById("att-report-section").style.display  = "none";
+    document.getElementById("btn-save-att").style.display        = "none";
+    renderAttRecords();
+  } else {
+    // Admins and teachers land on Mark tab
+    document.querySelectorAll("#att-tabs .tab").forEach((t, i) => {
+      t.classList.toggle("active", i === 0);
+    });
+    document.getElementById("att-mark-section").style.display    = "block";
+    document.getElementById("att-records-section").style.display = "none";
+    document.getElementById("att-report-section").style.display  = "none";
+    document.getElementById("btn-save-att").style.display        = "";
+  }
 }
 
 function setAttTab(tab, el) {
-  document
-    .querySelectorAll("#att-tabs .tab")
-    .forEach((t) => t.classList.remove("active"));
+  // Students cannot access the Mark Attendance tab
+  if (tab === "mark" && currentUser && currentUser.role === "student") {
+    showToast("Only teachers can mark attendance", "error");
+    return;
+  }
+
+  document.querySelectorAll("#att-tabs .tab").forEach((t) => t.classList.remove("active"));
   el.classList.add("active");
-  document.getElementById("att-mark-section").style.display =
-    tab === "mark" ? "block" : "none";
-  document.getElementById("att-records-section").style.display =
-    tab === "records" ? "block" : "none";
-  document.getElementById("att-report-section").style.display =
-    tab === "report" ? "block" : "none";
-  document.getElementById("btn-save-att").style.display =
-    tab === "mark" ? "" : "none";
+
+  document.getElementById("att-mark-section").style.display    = tab === "mark"    ? "block" : "none";
+  document.getElementById("att-records-section").style.display = tab === "records" ? "block" : "none";
+  document.getElementById("att-report-section").style.display  = tab === "report"  ? "block" : "none";
+
+  // Save button only visible to teachers/admins on mark tab
+  const canMark = currentUser && currentUser.role !== "student";
+  document.getElementById("btn-save-att").style.display = (tab === "mark" && canMark) ? "" : "none";
+
   if (tab === "records") renderAttRecords();
-  if (tab === "report") renderAttReport();
+  if (tab === "report")  renderAttReport();
 }
 
 function loadAttendanceForMark() {
@@ -1820,6 +1853,10 @@ function markAllAttendance(status) {
 }
 
 function saveAttendance() {
+  if (currentUser && currentUser.role === "student") {
+    showToast("Students are not allowed to mark attendance", "error");
+    return;
+  }
   const cls = document.getElementById("att-class").value;
   const date = document.getElementById("att-date").value;
   if (!cls) {
@@ -1863,47 +1900,77 @@ function saveAttendance() {
 let attRecPage = 1,
   attRecPageSize = 15,
   filteredAttRec = [];
+
 function renderAttRecords() {
-  const db = getDB();
-  filteredAttRec = db.attendance;
+  const db        = getDB();
+  const isStudent = currentUser && currentUser.role === "student";
+
+  // Show/hide student notice and search bar
+  const notice  = document.getElementById("att-student-notice");
+  const filters = document.getElementById("att-rec-filters");
+  if (notice)  notice.style.display  = isStudent ? "flex" : "none";
+  if (filters) {
+    // Hide search input for students (they only see their own records)
+    const searchBox = filters.querySelector(".search-input");
+    if (searchBox) searchBox.style.display = isStudent ? "none" : "";
+  }
+
+  if (isStudent) {
+    // Scope to current student's records only
+    const studentRecord = db.students.find(
+      (s) => s.studentId === currentUser.studentId ||
+             `${s.firstName} ${s.lastName}` === currentUser.name
+    );
+    filteredAttRec = studentRecord
+      ? db.attendance.filter((a) => a.studentId === studentRecord.id)
+      : [];
+  } else {
+    filteredAttRec = db.attendance;
+  }
+
   filterAttRecords();
 }
 
 function filterAttRecords() {
-  const db = getDB();
-  const search = document.getElementById("att-rec-search").value.toLowerCase();
-  const date = document.getElementById("att-rec-date").value;
-  filteredAttRec = db.attendance
+  const db        = getDB();
+  const isStudent = currentUser && currentUser.role === "student";
+  const search    = document.getElementById("att-rec-search").value.toLowerCase();
+  const date      = document.getElementById("att-rec-date").value;
+
+  // For students, base set is already scoped to their own records from renderAttRecords
+  // For teachers/admins re-fetch all each time
+  let base = isStudent ? filteredAttRec : db.attendance;
+
+  const result = base
     .filter((a) => {
-      const s = db.students.find((x) => x.id === a.studentId);
+      const s    = db.students.find((x) => x.id === a.studentId);
       const name = s ? `${s.firstName} ${s.lastName}`.toLowerCase() : "";
       return (!search || name.includes(search)) && (!date || a.date === date);
     })
     .sort((a, b) => b.date.localeCompare(a.date));
-  const db2 = db;
+
+  if (!isStudent) filteredAttRec = result; // update for pagination
+
   const start = (attRecPage - 1) * attRecPageSize;
-  const page = filteredAttRec.slice(start, start + attRecPageSize);
+  const page  = result.slice(start, start + attRecPageSize);
+
   document.getElementById("att-records-tbody").innerHTML =
-    page
-      .map((a) => {
-        const s = db2.students.find((x) => x.id === a.studentId);
-        const name = s ? `${s.firstName} ${s.lastName}` : "Unknown";
-        const sc =
-          a.status === "Present"
-            ? "badge-green"
-            : a.status === "Absent"
-              ? "badge-red"
-              : "badge-amber";
-        return `<tr><td>${name}</td><td>${s ? s.class : "—"}</td><td>${a.date}</td><td><span class="badge ${sc}">${a.status}</span></td></tr>`;
-      })
-      .join("") ||
-    `<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">📋</div><p>No records</p></div></td></tr>`;
-  renderPagination(
-    "att-rec",
-    filteredAttRec.length,
-    attRecPage,
-    attRecPageSize,
-  );
+    page.map((a) => {
+      const s  = db.students.find((x) => x.id === a.studentId);
+      const name = s ? `${s.firstName} ${s.lastName}` : "Unknown";
+      const sc = a.status === "Present" ? "badge-green"
+               : a.status === "Absent"  ? "badge-red"
+               : "badge-amber";
+      return `<tr>
+        <td>${name}</td>
+        <td>${s ? s.class : "—"}</td>
+        <td>${a.date}</td>
+        <td><span class="badge ${sc}">${a.status}</span></td>
+      </tr>`;
+    }).join("") ||
+    `<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">📋</div><p>No records found</p></div></td></tr>`;
+
+  renderPagination("att-rec", result.length, attRecPage, attRecPageSize);
 }
 
 function renderAttReport() {
@@ -1948,10 +2015,17 @@ function renderAttReport() {
 // ═══════════════════════════════════════════════
 //   REPORTS
 // ═══════════════════════════════════════════════
+
+// Per-tab filter + pagination state
+const reportState = {
+  students:   { page:1, pageSize:15, search:"", classFilter:"", statusFilter:"" },
+  attendance: { page:1, pageSize:15, search:"", classFilter:"", rateFilter:""   },
+  summary:    { page:1, pageSize:16 },
+  fees:       {}
+};
+
 function setReportTab(tab, el) {
-  document
-    .querySelectorAll("#page-reports .tab")
-    .forEach((t) => t.classList.remove("active"));
+  document.querySelectorAll("#page-reports .tab").forEach(t => t.classList.remove("active"));
   el.classList.add("active");
   renderReport(tab);
 }
@@ -1959,110 +2033,204 @@ function setReportTab(tab, el) {
 function renderReport(tab) {
   const db = getDB();
   const el = document.getElementById("report-content");
+
+  // ── SUMMARY ──────────────────────────────────────────
   if (tab === "summary") {
-    const totalStudents = db.students.length;
-    const activeStudents = db.students.filter(
-      (s) => s.status === "Active",
-    ).length;
-    const totalFees = db.fees
-      .filter((f) => f.status === "Paid")
-      .reduce((a, f) => a + Number(f.amount), 0);
-    const pendingFees = db.fees
-      .filter((f) => f.status !== "Paid")
-      .reduce((a, f) => a + Number(f.amount), 0);
-    const att = db.attendance;
-    const attPct = att.length
-      ? Math.round(
-          (att.filter((a) => a.status === "Present").length / att.length) * 100,
-        )
-      : 0;
+    const totalFees  = db.fees.filter(f=>f.status==="Paid").reduce((a,f)=>a+Number(f.amount),0);
+    const att        = db.attendance;
+    const attPct     = att.length ? Math.round(att.filter(a=>a.status==="Present").length/att.length*100) : 0;
+    const allClasses = db.classes.filter(cls => db.students.some(s=>s.class===cls));
+    const st    = reportState.summary;
+    const start = (st.page-1)*st.pageSize;
+    const pageCls = allClasses.slice(start, start+st.pageSize);
+
     el.innerHTML = `
       <div class="stats-grid" style="margin-bottom:24px;">
-        <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--accent-glow)">🎓</div></div><div class="stat-val">${totalStudents}</div><div class="stat-label">Total Students</div></div>
+        <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--accent-glow)">🎓</div></div><div class="stat-val">${db.students.length}</div><div class="stat-label">Total Students</div></div>
         <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--purple-bg)">👩‍🏫</div></div><div class="stat-val">${db.teachers.length}</div><div class="stat-label">Total Teachers</div></div>
-        <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--green-bg)">💰</div></div><div class="stat-val">$${(totalFees / 1000).toFixed(1)}k</div><div class="stat-label">Fees Collected</div></div>
+        <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--green-bg)">💰</div></div><div class="stat-val">$${(totalFees/1000).toFixed(1)}k</div><div class="stat-label">Fees Collected</div></div>
         <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--teal-bg)">📋</div></div><div class="stat-val">${attPct}%</div><div class="stat-label">Avg Attendance</div></div>
       </div>
       <div class="table-card">
-        <div class="table-toolbar"><h3>Class Summary</h3></div>
-        <table><thead><tr><th>Class</th><th>Students</th><th>Active</th><th>Fees Collected</th><th>Avg Attendance</th></tr></thead>
-        <tbody>${db.classes
-          .slice(0, 10)
-          .map((cls) => {
-            const clsStu = db.students.filter((s) => s.class === cls);
-            const clsFees = db.fees.filter((f) => {
-              const s = db.students.find((x) => x.id === f.studentId);
-              return s && s.class === cls && f.status === "Paid";
-            });
-            const clsAtt = db.attendance.filter((a) => a.class === cls);
-            const ap = clsAtt.length
-              ? Math.round(
-                  (clsAtt.filter((a) => a.status === "Present").length /
-                    clsAtt.length) *
-                    100,
-                )
-              : 0;
-            return `<tr><td>${cls}</td><td>${clsStu.length}</td><td>${clsStu.filter((s) => s.status === "Active").length}</td><td>$${clsFees.reduce((a, f) => a + Number(f.amount), 0).toLocaleString()}</td><td>${ap}%</td></tr>`;
-          })
-          .join("")}</tbody></table>
+        <div class="table-toolbar">
+          <h3>Class Summary</h3><div class="spacer"></div>
+          <span style="font-size:12px;color:var(--text2)">${allClasses.length} classes</span>
+        </div>
+        <div style="overflow-x:auto;"><table>
+          <thead><tr><th>Class</th><th>Students</th><th>Active</th><th>Fees Collected</th><th>Avg Attendance</th></tr></thead>
+          <tbody>${pageCls.map(cls => {
+            const clsStu  = db.students.filter(s=>s.class===cls);
+            const clsFees = db.fees.filter(f=>{const s=db.students.find(x=>x.id===f.studentId);return s&&s.class===cls&&f.status==="Paid";});
+            const clsAtt  = db.attendance.filter(a=>a.class===cls);
+            const ap = clsAtt.length ? Math.round(clsAtt.filter(a=>a.status==="Present").length/clsAtt.length*100) : 0;
+            return "<tr><td>"+cls+"</td><td>"+clsStu.length+"</td><td>"+clsStu.filter(s=>s.status==="Active").length+"</td><td>$"+clsFees.reduce((a,f)=>a+Number(f.amount),0).toLocaleString()+"</td><td><div style=\"display:flex;align-items:center;gap:8px;\"><div class=\"progress-bar\" style=\"width:60px\"><div class=\"progress-fill\" style=\"width:"+ap+"%;background:"+(ap>80?"var(--green)":ap>60?"var(--amber)":"var(--red)")+"\"></div></div>"+ap+"%</div></td></tr>";
+          }).join("")}</tbody>
+        </table></div>
+        <div class="pagination" id="rpt-summary-pg"></div>
       </div>`;
+    renderPagination("rpt-summary", allClasses.length, st.page, st.pageSize);
+
+  // ── STUDENTS ─────────────────────────────────────────
   } else if (tab === "students") {
-    const classCounts = {};
-    db.students.forEach((s) => {
-      classCounts[s.class] = (classCounts[s.class] || 0) + 1;
-    });
-    el.innerHTML = `<div class="table-card">
-      <div class="table-toolbar"><h3>Student Report</h3><div class="spacer"></div><span style="font-size:12px;color:var(--text2)">${db.students.length} total</span></div>
-      <table><thead><tr><th>Name</th><th>ID</th><th>Class</th><th>Status</th><th>Fees</th></tr></thead>
-      <tbody>${db.students
-        .slice(0, 20)
-        .map((s) => {
-          const fees = db.fees
-            .filter((f) => f.studentId === s.id && f.status === "Paid")
-            .reduce((a, f) => a + Number(f.amount), 0);
-          return `<tr><td>${s.firstName} ${s.lastName}</td><td><code style="font-size:11px;font-family:var(--mono)">${s.studentId}</code></td><td>${s.class}</td><td><span class="badge ${s.status === "Active" ? "badge-green" : "badge-red"}">${s.status}</span></td><td>$${fees.toLocaleString()}</td></tr>`;
-        })
-        .join("")}</tbody></table></div>`;
+    const st = reportState.students;
+    let list = db.students.slice();
+    if (st.search)       list = list.filter(s=>`${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(st.search));
+    if (st.classFilter)  list = list.filter(s=>s.class===st.classFilter);
+    if (st.statusFilter) list = list.filter(s=>s.status===st.statusFilter);
+    list.sort((a,b)=>a.firstName.localeCompare(b.firstName));
+    const start = (st.page-1)*st.pageSize;
+    const page  = list.slice(start, start+st.pageSize);
+    const classOpts = db.classes.map(c=>`<option value="${c}" ${st.classFilter===c?"selected":""}>${c}</option>`).join("");
+
+    el.innerHTML = `
+      <div class="table-card">
+        <div class="table-toolbar" style="flex-wrap:wrap;gap:8px;">
+          <h3>Student Report</h3><div class="spacer"></div>
+          <div class="search-input"><span>🔍</span><input placeholder="Search name or ID…" value="${st.search}" oninput="rptStudentFilter('search',this.value)" style="width:170px;"></div>
+          <select class="filter-select" onchange="rptStudentFilter('class',this.value)"><option value="">All Classes</option>${classOpts}</select>
+          <select class="filter-select" onchange="rptStudentFilter('status',this.value)">
+            <option value="">All Status</option>
+            <option value="Active"   ${st.statusFilter==="Active"  ?"selected":""}>Active</option>
+            <option value="Inactive" ${st.statusFilter==="Inactive"?"selected":""}>Inactive</option>
+          </select>
+          <span style="font-size:12px;color:var(--text2);white-space:nowrap;">${list.length} / ${db.students.length}</span>
+        </div>
+        <div style="overflow-x:auto;"><table>
+          <thead><tr><th>Name</th><th class="hide-sm">ID</th><th>Class</th><th class="hide-sm">Gender</th><th>Status</th><th>Fees Paid</th><th class="hide-sm">Admission</th></tr></thead>
+          <tbody>${page.length ? page.map(s=>{
+            const fees = db.fees.filter(f=>f.studentId===s.id&&f.status==="Paid").reduce((a,f)=>a+Number(f.amount),0);
+            return "<tr><td><div style=\"font-weight:500\">"+s.firstName+" "+s.lastName+"</div></td>"
+              +"<td class=\"hide-sm\"><code style=\"font-size:11px;font-family:var(--mono)\">"+s.studentId+"</code></td>"
+              +"<td>"+s.class+"</td>"
+              +"<td class=\"hide-sm\">"+(s.gender||"—")+"</td>"
+              +"<td><span class=\"badge "+(s.status==="Active"?"badge-green":"badge-red")+"\">"+ s.status+"</span></td>"
+              +"<td style=\"font-weight:600\">$"+fees.toLocaleString()+"</td>"
+              +"<td class=\"hide-sm\" style=\"font-size:12px;color:var(--text2);\">"+(s.admissionDate||"—")+"</td></tr>";
+          }).join("") : "<tr><td colspan=\"7\"><div class=\"empty-state\"><div class=\"empty-icon\">🎓</div><p>No students match filters</p></div></td></tr>"}</tbody>
+        </table></div>
+        <div class="pagination" id="rpt-students-pg"></div>
+      </div>`;
+    renderPagination("rpt-students", list.length, st.page, st.pageSize);
+
+  // ── FEES ─────────────────────────────────────────────
   } else if (tab === "fees") {
-    const byMonth = MONTHS.map((m) => ({
-      month: m,
-      collected: db.fees
-        .filter((f) => f.month === m && f.status === "Paid")
-        .reduce((a, f) => a + Number(f.amount), 0),
-      pending: db.fees
-        .filter((f) => f.month === m && f.status !== "Paid")
-        .reduce((a, f) => a + Number(f.amount), 0),
+    const byMonth = MONTHS.map(m=>({
+      month:m,
+      collected:db.fees.filter(f=>f.month===m&&f.status==="Paid").reduce((a,f)=>a+Number(f.amount),0),
+      pending:  db.fees.filter(f=>f.month===m&&f.status!=="Paid").reduce((a,f)=>a+Number(f.amount),0)
     }));
-    el.innerHTML = `<div class="table-card">
-      <div class="table-toolbar"><h3>Monthly Fee Report</h3></div>
-      <table><thead><tr><th>Month</th><th>Collected</th><th>Pending</th><th>Total</th><th>Collection Rate</th></tr></thead>
-      <tbody>${byMonth
-        .map((r) => {
-          const total = r.collected + r.pending;
-          const rate = total ? Math.round((r.collected / total) * 100) : 0;
-          return `<tr><td>${r.month}</td><td style="color:var(--green)">$${r.collected.toLocaleString()}</td><td style="color:var(--amber)">$${r.pending.toLocaleString()}</td><td>$${total.toLocaleString()}</td><td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="width:80px"><div class="progress-fill" style="width:${rate}%;background:${rate > 80 ? "var(--green)" : rate > 60 ? "var(--amber)" : "var(--red)"}"></div></div>${rate}%</div></td></tr>`;
-        })
-        .join("")}</tbody></table></div>`;
+    const grandC = byMonth.reduce((a,r)=>a+r.collected,0);
+    const grandP = byMonth.reduce((a,r)=>a+r.pending,0);
+    el.innerHTML = `
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3>Monthly Fee Report</h3><div class="spacer"></div>
+          <span style="font-size:12px;color:var(--green);font-weight:600;">Collected: $${grandC.toLocaleString()}</span>
+          &nbsp;&nbsp;<span style="font-size:12px;color:var(--amber);">Pending: $${grandP.toLocaleString()}</span>
+        </div>
+        <div style="overflow-x:auto;"><table>
+          <thead><tr><th>Month</th><th>Collected</th><th>Pending</th><th>Total</th><th>Collection Rate</th></tr></thead>
+          <tbody>${byMonth.map(r=>{
+            const total=r.collected+r.pending;
+            const rate=total?Math.round(r.collected/total*100):0;
+            return "<tr><td style=\"font-weight:500\">"+r.month+"</td>"
+              +"<td style=\"color:var(--green);font-weight:600;\">$"+r.collected.toLocaleString()+"</td>"
+              +"<td style=\"color:var(--amber);\">$"+r.pending.toLocaleString()+"</td>"
+              +"<td>$"+total.toLocaleString()+"</td>"
+              +"<td><div style=\"display:flex;align-items:center;gap:8px;\"><div class=\"progress-bar\" style=\"width:80px\"><div class=\"progress-fill\" style=\"width:"+rate+"%;background:"+(rate>80?"var(--green)":rate>60?"var(--amber)":"var(--red)")+"\"></div></div><span style=\"font-weight:600\">"+rate+"%</span></div></td></tr>";
+          }).join("")}</tbody>
+        </table></div>
+      </div>`;
+
+  // ── ATTENDANCE ───────────────────────────────────────
   } else if (tab === "attendance") {
+    const st = reportState.attendance;
     const summary = {};
-    db.attendance.forEach((a) => {
-      if (!summary[a.studentId])
-        summary[a.studentId] = { present: 0, absent: 0, late: 0 };
-      summary[a.studentId][a.status.toLowerCase()]++;
+    db.attendance.forEach(a=>{
+      if(!summary[a.studentId]) summary[a.studentId]={present:0,absent:0,late:0};
+      const k=a.status.toLowerCase(); if(k in summary[a.studentId]) summary[a.studentId][k]++;
     });
-    el.innerHTML = `<div class="table-card">
-      <div class="table-toolbar"><h3>Attendance Summary</h3></div>
-      <table><thead><tr><th>Student</th><th>Class</th><th>Present</th><th>Absent</th><th>Rate</th></tr></thead>
-      <tbody>${db.students
-        .slice(0, 20)
-        .map((s) => {
-          const d = summary[s.id] || { present: 0, absent: 0, late: 0 };
-          const total = d.present + d.absent + d.late;
-          const rate = total ? Math.round((d.present / total) * 100) : 0;
-          return `<tr><td>${s.firstName} ${s.lastName}</td><td>${s.class}</td><td style="color:var(--green)">${d.present}</td><td style="color:var(--red)">${d.absent}</td><td><span class="badge ${rate > 80 ? "badge-green" : rate > 60 ? "badge-amber" : "badge-red"}">${rate}%</span></td></tr>`;
-        })
-        .join("")}</tbody></table></div>`;
+    let list = db.students.slice();
+    if (st.search)      list = list.filter(s=>`${s.firstName} ${s.lastName}`.toLowerCase().includes(st.search));
+    if (st.classFilter) list = list.filter(s=>s.class===st.classFilter);
+    if (st.rateFilter) {
+      list = list.filter(s=>{
+        const d=summary[s.id]||{present:0,absent:0,late:0};
+        const t=d.present+d.absent+d.late;
+        const r=t?Math.round(d.present/t*100):0;
+        if(st.rateFilter==="high")   return r>=80;
+        if(st.rateFilter==="medium") return r>=60&&r<80;
+        if(st.rateFilter==="low")    return r<60;
+        return true;
+      });
+    }
+    list.sort((a,b)=>a.firstName.localeCompare(b.firstName));
+    const start=(st.page-1)*st.pageSize;
+    const page=list.slice(start,start+st.pageSize);
+    const classOpts=db.classes.map(c=>`<option value="${c}" ${st.classFilter===c?"selected":""}>${c}</option>`).join("");
+    const totalPresent=Object.values(summary).reduce((a,d)=>a+d.present,0);
+    const overallRate=db.attendance.length?Math.round(totalPresent/db.attendance.length*100):0;
+    const goodCount=db.students.filter(s=>{const d=summary[s.id]||{present:0,absent:0,late:0};const t=d.present+d.absent+d.late;return t&&d.present/t>=0.8;}).length;
+    const riskCount=db.students.filter(s=>{const d=summary[s.id]||{present:0,absent:0,late:0};const t=d.present+d.absent+d.late;return t&&d.present/t<0.6;}).length;
+
+    el.innerHTML = `
+      <div class="stats-grid" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--green-bg)">📊</div></div><div class="stat-val">${overallRate}%</div><div class="stat-label">Overall Rate</div></div>
+        <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--accent-glow)">👥</div></div><div class="stat-val">${db.students.length}</div><div class="stat-label">Total Students</div></div>
+        <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--green-bg)">🟢</div></div><div class="stat-val">${goodCount}</div><div class="stat-label">≥80% Attendance</div></div>
+        <div class="stat-card"><div class="stat-top"><div class="stat-icon" style="background:var(--red-bg)">🔴</div></div><div class="stat-val">${riskCount}</div><div class="stat-label">&lt;60% At Risk</div></div>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar" style="flex-wrap:wrap;gap:8px;">
+          <h3>Attendance Summary</h3><div class="spacer"></div>
+          <div class="search-input"><span>🔍</span><input placeholder="Search student…" value="${st.search}" oninput="rptAttFilter('search',this.value)" style="width:160px;"></div>
+          <select class="filter-select" onchange="rptAttFilter('class',this.value)"><option value="">All Classes</option>${classOpts}</select>
+          <select class="filter-select" onchange="rptAttFilter('rate',this.value)">
+            <option value="">All Rates</option>
+            <option value="high"   ${st.rateFilter==="high"  ?"selected":""}>≥80% Good</option>
+            <option value="medium" ${st.rateFilter==="medium"?"selected":""}>60–79% Average</option>
+            <option value="low"    ${st.rateFilter==="low"   ?"selected":""}>&lt;60% At Risk</option>
+          </select>
+          <span style="font-size:12px;color:var(--text2);white-space:nowrap;">${list.length} / ${db.students.length}</span>
+        </div>
+        <div style="overflow-x:auto;"><table>
+          <thead><tr><th>Student</th><th>Class</th><th>Present</th><th>Absent</th><th class="hide-sm">Late</th><th class="hide-sm">Total</th><th>Rate</th></tr></thead>
+          <tbody>${page.length ? page.map(s=>{
+            const d=summary[s.id]||{present:0,absent:0,late:0};
+            const total=d.present+d.absent+d.late;
+            const rate=total?Math.round(d.present/total*100):0;
+            const rc=rate>=80?"var(--green)":rate>=60?"var(--amber)":"var(--red)";
+            const bc=rate>=80?"badge-green":rate>=60?"badge-amber":"badge-red";
+            return "<tr><td style=\"font-weight:500\">"+s.firstName+" "+s.lastName+"</td><td>"+s.class+"</td>"
+              +"<td style=\"color:var(--green);font-weight:600\">"+d.present+"</td>"
+              +"<td style=\"color:var(--red)\">"+d.absent+"</td>"
+              +"<td class=\"hide-sm\" style=\"color:var(--amber)\">"+d.late+"</td>"
+              +"<td class=\"hide-sm\">"+total+"</td>"
+              +"<td><div style=\"display:flex;align-items:center;gap:8px;\"><div class=\"progress-bar\" style=\"width:55px\"><div class=\"progress-fill\" style=\"width:"+rate+"%;background:"+rc+"\"></div></div><span class=\"badge "+bc+"\">"+rate+"%</span></div></td></tr>";
+          }).join("") : "<tr><td colspan=\"7\"><div class=\"empty-state\"><div class=\"empty-icon\">📋</div><p>No students match filters</p></div></td></tr>"}</tbody>
+        </table></div>
+        <div class="pagination" id="rpt-att-pg"></div>
+      </div>`;
+    renderPagination("rpt-att", list.length, st.page, st.pageSize);
   }
+}
+
+// Helper: wire report pagination in changePage
+// (handled by unified changePage below)
+
+function rptStudentFilter(key, val) {
+  const st = reportState.students; st.page = 1;
+  if (key==="search") st.search       = val.toLowerCase();
+  if (key==="class")  st.classFilter  = val;
+  if (key==="status") st.statusFilter = val;
+  renderReport("students");
+}
+function rptAttFilter(key, val) {
+  const st = reportState.attendance; st.page = 1;
+  if (key==="search") st.search      = val.toLowerCase();
+  if (key==="class")  st.classFilter = val;
+  if (key==="rate")   st.rateFilter  = val;
+  renderReport("attendance");
 }
 
 function exportPDF() {
@@ -2193,11 +2361,14 @@ function renderPagination(key, total, current, pageSize) {
 }
 
 function changePage(key, page) {
-  if (key === "students") { studentPage = page; applyStudentFilters(); }
-  if (key === "teachers") { teacherPage = page; applyTeacherFilters(); }
-  if (key === "fees")     { feePage = page;     applyFeeFilters();     }
-  if (key === "att-rec")  { attRecPage = page;  filterAttRecords();    }
-  if (key === "cm")       { cmState.page = page; renderMaterialsList(); }
+  if (key === "students")    { studentPage = page; applyStudentFilters(); }
+  if (key === "teachers")    { teacherPage = page; applyTeacherFilters(); }
+  if (key === "fees")        { feePage = page;     applyFeeFilters();     }
+  if (key === "att-rec")     { attRecPage = page;  filterAttRecords();    }
+  if (key === "cm")          { cmState.page = page; renderMaterialsList(); }
+  if (key === "rpt-summary") { reportState.summary.page   = page; renderReport("summary");    }
+  if (key === "rpt-students"){ reportState.students.page  = page; renderReport("students");   }
+  if (key === "rpt-att")     { reportState.attendance.page= page; renderReport("attendance"); }
 }
 
 // ═══════════════════════════════════════════════
