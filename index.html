@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EduCore — School Management System</title>
+<title>Radiant School — Management System</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%234f7cff'/><text y='.9em' font-size='68' font-family='Arial Black,Arial' font-weight='900' fill='white' x='50%' text-anchor='middle' dominant-baseline='middle' dy='0.05em'>R</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="stylesheet" href="style.css">
@@ -17,14 +18,14 @@
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo">
-      <div class="logo-icon">E</div>
-      <span>EduCore</span>
+      <div class="logo-icon">R</div>
+      <span>Radiant School</span>
     </div>
     <h2>Welcome back</h2>
     <p>Sign in to your school management portal</p>
     <div class="form-field">
       <label>Email</label>
-      <input type="email" id="login-email" placeholder="your.email@educore.school" autocomplete="username">
+      <input type="email" id="login-email" placeholder="your.email@radiantschool.school" autocomplete="username">
     </div>
     <div class="form-field" style="position:relative;">
       <label>Password</label>
@@ -53,8 +54,8 @@
   <!-- SIDEBAR -->
   <nav id="sidebar">
     <div class="sidebar-header">
-      <div class="logo-icon">E</div>
-      <span class="logo-text">EduCore</span>
+      <div class="logo-icon">R</div>
+      <span class="logo-text">Radiant School</span>
     </div>
     <div class="sidebar-nav" id="sidebar-nav"></div>
     <div class="sidebar-footer">
@@ -341,6 +342,37 @@
         <div class="pagination" id="cm-pagination"></div>
       </div>
 
+      <!-- TIMETABLE -->
+      <div class="page" id="page-timetable">
+        <div class="page-header">
+          <div>
+            <h2>Timetable</h2>
+            <p id="tt-subtitle">Weekly class schedule</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="tt-view-select" class="filter-select" onchange="renderTimetablePage()" style="font-size:13px;">
+              <option value="">Select Class / Teacher</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" id="btn-tt-import" onclick="openTTImportModal()" style="display:none;" title="Import a full class timetable at once">📥 Import</button>
+            <button class="btn btn-accent" id="btn-tt-add" onclick="openTTModal()" style="display:none;">＋ Add Period</button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div id="tt-legend" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+        <!-- Timetable grid -->
+        <div class="tt-wrapper">
+          <div id="tt-grid-container">
+            <div class="tt-empty">
+              <div class="tt-empty-icon">📅</div>
+              <h3>Select a class or teacher</h3>
+              <p>Use the dropdown above to view a timetable</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- REPORTS -->
       <div class="page" id="page-reports">
         <div class="page-header">
@@ -611,6 +643,120 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('manage-subjects-modal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- TIMETABLE PERIOD MODAL (Admin only) -->
+<div class="modal-overlay" id="tt-modal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <h3 id="tt-modal-title">Add Period</h3>
+      <button class="close-btn" onclick="closeModal('tt-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Day <span class="required">*</span></label>
+          <select id="tt-day">
+            <option value="Monday">Monday</option>
+            <option value="Tuesday">Tuesday</option>
+            <option value="Wednesday">Wednesday</option>
+            <option value="Thursday">Thursday</option>
+            <option value="Friday">Friday</option>
+            <option value="Saturday">Saturday</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Period <span class="required">*</span></label>
+          <select id="tt-period">
+            <option value="1">Period 1</option>
+            <option value="2">Period 2</option>
+            <option value="3">Period 3</option>
+            <option value="4">Period 4</option>
+            <option value="5">Period 5</option>
+            <option value="6">Period 6</option>
+            <option value="7">Period 7</option>
+            <option value="8">Period 8</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Start Time <span class="required">*</span></label>
+          <input type="time" id="tt-start" value="08:00">
+          <div class="form-error" id="tt-start-err"></div>
+        </div>
+        <div class="form-group">
+          <label>End Time <span class="required">*</span></label>
+          <input type="time" id="tt-end" value="08:45">
+          <div class="form-error" id="tt-end-err"></div>
+        </div>
+        <div class="form-group">
+          <label>Class <span class="required">*</span></label>
+          <select id="tt-class">
+            <option value="">Select Class</option>
+          </select>
+          <div class="form-error" id="tt-class-err"></div>
+        </div>
+        <div class="form-group">
+          <label>Subject <span class="required">*</span></label>
+          <select id="tt-subject">
+            <option value="">Select Subject</option>
+          </select>
+          <div class="form-error" id="tt-subject-err"></div>
+        </div>
+        <div class="form-group full">
+          <label>Teacher <span class="required">*</span></label>
+          <select id="tt-teacher">
+            <option value="">Select Teacher</option>
+          </select>
+          <div class="form-error" id="tt-teacher-err"></div>
+        </div>
+        <div class="form-group full">
+          <label>Room / Location</label>
+          <input id="tt-room" placeholder="e.g. Room 204, Science Lab, Gym">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('tt-modal')">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="tt-delete-btn" style="display:none;margin-right:auto;" onclick="deletePeriod()">🗑 Delete Period</button>
+      <button class="btn btn-accent" onclick="savePeriod()">Save Period</button>
+    </div>
+  </div>
+</div>
+
+<!-- TIMETABLE BULK IMPORT MODAL -->
+<div class="modal-overlay" id="tt-import-modal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h3>Import Timetable</h3>
+      <button class="close-btn" onclick="closeModal('tt-import-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner" style="margin-bottom:16px;">
+        📋 This will add all periods at once for a class. Existing periods for the same class will be replaced.
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Class to Import For <span class="required">*</span></label>
+          <select id="tt-import-class"><option value="">Select Class</option></select>
+          <div class="form-error" id="tt-import-class-err"></div>
+        </div>
+        <div class="form-group">
+          <label>Default Teacher <span class="required">*</span></label>
+          <select id="tt-import-teacher"><option value="">Select Teacher</option></select>
+          <div class="form-error" id="tt-import-teacher-err"></div>
+        </div>
+      </div>
+      <div style="margin:16px 0 8px;font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;">
+        Weekly Schedule
+      </div>
+      <div id="tt-import-grid" style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('tt-import-modal')">Cancel</button>
+      <button class="btn btn-danger btn-sm" onclick="clearClassTimetable()" style="margin-right:auto;">🗑 Clear Class Timetable</button>
+      <button class="btn btn-accent" onclick="saveBulkTimetable()">💾 Save Full Timetable</button>
     </div>
   </div>
 </div>

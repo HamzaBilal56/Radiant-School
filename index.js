@@ -2,7 +2,7 @@
 //   DATABASE (localStorage)
 // ═══════════════════════════════════════════════
 const DB_KEY = "educore_db";
-const DB_VERSION = 4; // bumped: adds materials + subjects tables
+const DB_VERSION = 5; // bumped: Radiant School branding + email domain // bumped: adds materials + subjects tables
 
 function getDB() {
   const raw = localStorage.getItem(DB_KEY);
@@ -29,7 +29,7 @@ function initDB() {
       {
         id: "u1",
         name: "Principal Admin",
-        email: "admin@educore.school",
+        email: "admin@radiantschool.school",
         password: "admin123",
         role: "admin",
         avatar: "PA",
@@ -62,10 +62,10 @@ function initDB() {
   seedData(db);
 
   // ── Generate teacher accounts ──
-  // Email : firstname.lastnameT001@educore.school  (no spaces, lowercase)
+  // Email : hamza.bilalt001@radiantschool.school  (no spaces, lowercase)
   // Password : DOB in YYYY-MM-DD format (e.g. 1985-06-14)
   db.teachers.forEach((t) => {
-    const email = `${t.firstName.toLowerCase()}.${t.lastName.toLowerCase()}${t.teacherId.toLowerCase()}@educore.school`;
+    const email = `${t.firstName.toLowerCase()}.${t.lastName.toLowerCase()}${t.teacherId.toLowerCase()}@radiantschool.school`;
     const pass = t.dob; // e.g. "1985-06-14"
     t.email = email; // keep teacher record in sync
     db.users.push({
@@ -81,10 +81,10 @@ function initDB() {
   });
 
   // ── Generate student accounts ──
-  // Email : firstname.lastnameS0001@school.edu
+  // Email : firstname.lastnameS0001@radiantschool.school
   // Password : DOB in YYYY-MM-DD format
   db.students.forEach((s) => {
-    const email = `${s.firstName.toLowerCase()}.${s.lastName.toLowerCase()}${s.studentId.toLowerCase()}@school.edu`;
+    const email = `${s.firstName.toLowerCase()}.${s.lastName.toLowerCase()}${s.studentId.toLowerCase()}@radiantschool.school`;
     const pass = s.dob;
     s.email = email;
     db.users.push({
@@ -249,7 +249,7 @@ function seedData(db) {
       dob,
       qualification: `${rnd(["B.Sc", "M.Sc", "Ph.D", "B.Ed", "M.Ed"])} ${sub}`,
       phone: `+1${rndInt(200, 999)}${rndInt(1000000, 9999999)}`,
-      email: `${fn.toLowerCase()}.${ln.toLowerCase()}@educore.school`,
+      email: `${fn.toLowerCase()}.${ln.toLowerCase()}@radiantschool.school`,
       salary: rndInt(38000, 75000),
       joinDate: `${rndInt(2015, 2022)}-${String(rndInt(1, 12)).padStart(2, "0")}-01`,
       status: Math.random() > 0.1 ? "Active" : "On Leave",
@@ -442,58 +442,40 @@ function handleLogout(e) {
 // ═══════════════════════════════════════════════
 const NAV_CONFIG = {
   admin: [
-    {
-      section: "Main",
-      items: [
-        { id: "dashboard", label: "Dashboard", icon: "🏠" },
-        { id: "students", label: "Students", icon: "🎓" },
-        { id: "teachers", label: "Teachers", icon: "👩‍🏫" },
-      ],
-    },
+    { section: "Main", items: [
+        { id: "dashboard", label: "Dashboard",  icon: "🏠" },
+        { id: "students",  label: "Students",   icon: "🎓" },
+        { id: "teachers",  label: "Teachers",   icon: "👩‍🏫" },
+    ]},
     { section: "Finance", items: [{ id: "fees", label: "Fees", icon: "💰" }] },
-    {
-      section: "Academic",
-      items: [
-        { id: "attendance", label: "Attendance", icon: "📋" },
+    { section: "Academic", items: [
+        { id: "attendance", label: "Attendance",      icon: "📋" },
+        { id: "timetable",  label: "Timetable",       icon: "🗓" },
         { id: "classes",    label: "Class Materials", icon: "📂" },
-        { id: "reports",    label: "Reports", icon: "📊" },
-      ],
-    },
-    {
-      section: "Account",
-      items: [{ id: "notifications", label: "Notifications", icon: "🔔" }],
-    },
+        { id: "reports",    label: "Reports",         icon: "📊" },
+    ]},
+    { section: "Account", items: [{ id: "notifications", label: "Notifications", icon: "🔔" }] },
   ],
   teacher: [
-    {
-      section: "Main",
-      items: [
-        { id: "dashboard", label: "Dashboard", icon: "🏠" },
-        { id: "students",  label: "Students", icon: "🎓" },
-        { id: "attendance",label: "Attendance", icon: "📋" },
-        { id: "classes",   label: "Class Materials", icon: "📂" },
-        { id: "reports",   label: "Reports", icon: "📊" },
-      ],
-    },
-    {
-      section: "Account",
-      items: [{ id: "notifications", label: "Notifications", icon: "🔔" }],
-    },
+    { section: "Main", items: [
+        { id: "dashboard",  label: "Dashboard",       icon: "🏠" },
+        { id: "students",   label: "Students",        icon: "🎓" },
+        { id: "attendance", label: "Attendance",      icon: "📋" },
+        { id: "timetable",  label: "My Timetable",   icon: "🗓" },
+        { id: "classes",    label: "Class Materials", icon: "📂" },
+        { id: "reports",    label: "Reports",         icon: "📊" },
+    ]},
+    { section: "Account", items: [{ id: "notifications", label: "Notifications", icon: "🔔" }] },
   ],
   student: [
-    {
-      section: "Main",
-      items: [
-        { id: "dashboard", label: "Dashboard", icon: "🏠" },
-        { id: "fees",      label: "My Fees", icon: "💰" },
-        { id: "attendance",label: "Attendance", icon: "📋" },
-        { id: "classes",   label: "Class Materials", icon: "📂" },
-      ],
-    },
-    {
-      section: "Account",
-      items: [{ id: "notifications", label: "Notifications", icon: "🔔" }],
-    },
+    { section: "Main", items: [
+        { id: "dashboard",  label: "Dashboard",       icon: "🏠" },
+        { id: "fees",       label: "My Fees",         icon: "💰" },
+        { id: "attendance", label: "Attendance",      icon: "📋" },
+        { id: "timetable",  label: "My Timetable",   icon: "🗓" },
+        { id: "classes",    label: "Class Materials", icon: "📂" },
+    ]},
+    { section: "Account", items: [{ id: "notifications", label: "Notifications", icon: "🔔" }] },
   ],
 };
 
@@ -506,7 +488,7 @@ function initApp() {
   populateFilters();
   initClassModule();    // class materials module
   populateCMFilters();  // populate class/subject dropdowns in upload modal
-  // Show dashboard directly and render it — no refresh needed
+  initTimetable();      // timetable module
   showPage("dashboard");
 }
 
@@ -679,19 +661,20 @@ function showPage(pageId) {
       teachers:      "Teachers",
       fees:          "Fee Management",
       attendance:    "Attendance",
+      timetable:     "Timetable",
       classes:       "Class Materials",
       reports:       "Reports",
       profile:       "My Profile",
       notifications: "Notifications",
     }[pageId] || pageId;
   currentPage = pageId;
-  // Close mobile sidebar on navigation
   closeMobileSidebar();
   if (pageId === "dashboard")  renderDashboard();
   if (pageId === "students")   renderStudents();
   if (pageId === "teachers")   renderTeachers();
   if (pageId === "fees")       renderFees();
   if (pageId === "attendance") { resetAttTabs(); loadAttendanceForMark(); }
+  if (pageId === "timetable")  renderTimetablePage();
   if (pageId === "classes")    renderClassesPage();
   if (pageId === "reports") {
     // Reset filters/pagination so every visit starts fresh
@@ -843,37 +826,59 @@ function renderCharts(db) {
     d.style.height = containerH + "px";
   });
 
-  // Enrollment line
+  // Enrollment line — only up to the current month, data from real admissions
+  const now          = new Date();
+  const currentMonth = now.getMonth(); // 0-based (0=Jan … 5=Jun)
+  const currentYear  = now.getFullYear();
+  const allMonthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  // Slice labels to Jan → current month (inclusive)
+  const enrollLabels = allMonthLabels.slice(0, currentMonth + 1);
+
+  // Count students admitted in each month of the current year,
+  // then build a running cumulative total starting from the seeded base count
+  const totalStudents = db.students.length;
+  const admittedThisYear = db.students.filter(s => {
+    if (!s.admissionDate) return false;
+    return new Date(s.admissionDate).getFullYear() === currentYear;
+  });
+
+  // Monthly new admissions for Jan..currentMonth
+  const monthlyNew = enrollLabels.map((_, mi) =>
+    admittedThisYear.filter(s => new Date(s.admissionDate).getMonth() === mi).length
+  );
+
+  // Build cumulative: start from (totalStudents - sum of this year's admissions),
+  // then add each month's new admissions cumulatively
+  const baseCount = totalStudents - monthlyNew.reduce((a, n) => a + n, 0);
+  const enrollData = [];
+  let running = baseCount;
+  monthlyNew.forEach(n => { running += n; enrollData.push(running); });
+
+  // If all months show the same flat line (no dated admissions),
+  // fall back to a gentle upward curve that still ends at totalStudents
+  const allSame = enrollData.every(v => v === enrollData[0]);
+  const fallbackData = enrollLabels.map((_, i) => {
+    const start = Math.max(totalStudents - enrollLabels.length * 2, Math.round(totalStudents * 0.85));
+    return Math.round(start + (totalStudents - start) * (i / Math.max(enrollLabels.length - 1, 1)));
+  });
+  const finalEnrollData = allSame ? fallbackData : enrollData;
+
   if (charts.enrollment) charts.enrollment.destroy();
   charts.enrollment = new Chart(document.getElementById("chartEnrollment"), {
     type: "line",
     data: {
-      labels: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ],
-      datasets: [
-        {
-          label: "Students",
-          data: [28, 30, 32, 31, 34, 36, 35, 38, 40, 42, 41, 42],
-          borderColor: colors.accent + "1)",
-          backgroundColor: colors.accent + "0.1)",
-          tension: 0.4,
-          fill: true,
-          pointRadius: isMobile ? 2 : 3,
-          pointBackgroundColor: colors.accent + "1)",
-        },
-      ],
+      labels: enrollLabels,
+      datasets: [{
+        label: "Students",
+        data: finalEnrollData,
+        borderColor: colors.accent + "1)",
+        backgroundColor: colors.accent + "0.1)",
+        tension: 0.4,
+        fill: true,
+        pointRadius: isMobile ? 2 : 3,
+        pointBackgroundColor: colors.accent + "1)",
+      }]
     },
     options: { ...baseOpts },
   });
@@ -1219,7 +1224,7 @@ function saveStudent() {
     showToast("Student updated successfully", "success");
   } else {
     const sid = `S${String(db.students.length + 1).padStart(4, "0")}`;
-    const email = `${fname.toLowerCase()}.${lname.toLowerCase()}${sid.toLowerCase()}@school.edu`;
+    const email = `${fname.toLowerCase()}.${lname.toLowerCase()}${sid.toLowerCase()}@radiantschool.school`;
     const newStudent = {
       id: uid(),
       studentId: sid,
@@ -1228,7 +1233,7 @@ function saveStudent() {
       ...data,
     };
     db.students.push(newStudent);
-    // Create login account: email = firstname.lastnameS0001@school.edu, password = DOB
+    // Create login account: email = firstname.lastnameS0001@radiantschool.school, password = DOB
     db.users.push({
       id: uid(),
       name: `${fname} ${lname}`,
@@ -1438,7 +1443,7 @@ function saveTeacher() {
     showToast("Teacher updated", "success");
   } else {
     const tid = `T${String(db.teachers.length + 1).padStart(3, "0")}`;
-    const email = `${fname.toLowerCase()}.${lname.toLowerCase()}${tid.toLowerCase()}@educore.school`;
+    const email = `${fname.toLowerCase()}.${lname.toLowerCase()}${tid.toLowerCase()}@radiantschool.school`;
     const newTeacher = { id: uid(), teacherId: tid, email, ...data };
     db.teachers.push(newTeacher);
     // Create login account
@@ -1661,7 +1666,7 @@ function showReceipt(id) {
   document.getElementById("receipt-content").innerHTML = `
     <div style="border:1px solid var(--border2);border-radius:12px;padding:24px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
-        <div><div style="font-size:20px;font-weight:700">EduCore</div><div style="font-size:12px;color:var(--text2)">School Management System</div></div>
+        <div><div style="font-size:20px;font-weight:700">Radiant School</div><div style="font-size:12px;color:var(--text2)">School Management System</div></div>
         <div style="text-align:right"><div style="font-size:12px;color:var(--text3)">RECEIPT</div><div style="font-size:18px;font-weight:700;font-family:var(--mono)">${f.receiptNo}</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
@@ -2275,14 +2280,14 @@ function renderProfile() {
           <div style="background:var(--bg3);border-radius:10px;padding:14px 16px;border:1px solid var(--border);">
             <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">👑 Admin</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-              <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Email</div><code style="font-size:12px;font-family:var(--mono);color:var(--accent)">admin@educore.school</code></div>
+              <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Email</div><code style="font-size:12px;font-family:var(--mono);color:var(--accent)">admin@radiantschool.school</code></div>
               <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Password</div><code style="font-size:12px;font-family:var(--mono);color:var(--green)">admin123</code></div>
             </div>
           </div>
           <div style="background:var(--bg3);border-radius:10px;padding:14px 16px;border:1px solid var(--border);">
             <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">📚 Teachers</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-              <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Email format</div><code style="font-size:11px;font-family:var(--mono);color:var(--accent)">firstname.lastnameT001@educore.school</code></div>
+              <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Email format</div><code style="font-size:11px;font-family:var(--mono);color:var(--accent)">hamza.bilalt001@radiantschool.school</code></div>
               <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Password</div><code style="font-size:12px;font-family:var(--mono);color:var(--green)">Date of Birth (YYYY-MM-DD)</code></div>
             </div>
             ${sampleTeacher ? "<div style='font-size:11px;color:var(--text3);padding-top:8px;border-top:1px solid var(--border);line-height:2;'>Example — <b style='color:var(--text)'>" + sampleTeacher.name + "</b><br>Email: <code style='font-family:var(--mono);color:var(--accent)'>" + sampleTeacher.email + "</code><br>Password: <code style='font-family:var(--mono);color:var(--green)'>" + sampleTeacher.password + "</code></div>" : ""}
@@ -2290,7 +2295,7 @@ function renderProfile() {
           <div style="background:var(--bg3);border-radius:10px;padding:14px 16px;border:1px solid var(--border);">
             <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">🎓 Students</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-              <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Email format</div><code style="font-size:11px;font-family:var(--mono);color:var(--accent)">firstname.lastnameS0001@school.edu</code></div>
+              <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Email format</div><code style="font-size:11px;font-family:var(--mono);color:var(--accent)">firstname.lastnameS0001@radiantschool.school</code></div>
               <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px;">Password</div><code style="font-size:12px;font-family:var(--mono);color:var(--green)">Date of Birth (YYYY-MM-DD)</code></div>
             </div>
             ${sampleStudent ? "<div style='font-size:11px;color:var(--text3);padding-top:8px;border-top:1px solid var(--border);line-height:2;'>Example — <b style='color:var(--text)'>" + sampleStudent.name + "</b><br>Email: <code style='font-family:var(--mono);color:var(--accent)'>" + sampleStudent.email + "</code><br>Password: <code style='font-family:var(--mono);color:var(--green)'>" + sampleStudent.password + "</code></div>" : ""}
@@ -2349,15 +2354,28 @@ function renderPagination(key, total, current, pageSize) {
   if (!el) return;
   const totalPages = Math.ceil(total / pageSize) || 1;
   const start = total === 0 ? 0 : (current - 1) * pageSize + 1;
-  const end = Math.min(current * pageSize, total);
-  let btns = "";
+  const end   = Math.min(current * pageSize, total);
+
+  // Number buttons (hidden on very small screens via CSS)
+  let numBtns = "";
   for (let i = 1; i <= totalPages; i++) {
     if (i === 1 || i === totalPages || Math.abs(i - current) <= 1)
-      btns += `<button class="pg-btn ${i === current ? "active" : ""}" onclick="changePage('${key}',${i})">${i}</button>`;
+      numBtns += `<button class="pg-btn pg-num ${i === current ? "active" : ""}" onclick="changePage('${key}',${i})">${i}</button>`;
     else if (Math.abs(i - current) === 2)
-      btns += `<span style="color:var(--text3);padding:0 4px">…</span>`;
+      numBtns += `<span class="pg-ellipsis">…</span>`;
   }
-  el.innerHTML = `<span class="pagination-info">Showing ${start}–${end} of ${total}</span><div class="pagination-btns"><button class="pg-btn" onclick="changePage('${key}',${current - 1})" ${current === 1 ? "disabled" : ""}>‹</button>${btns}<button class="pg-btn" onclick="changePage('${key}',${current + 1})" ${current === totalPages ? "disabled" : ""}>›</button></div>`;
+
+  el.innerHTML = `
+    <span class="pagination-info">Showing ${start}–${end} of ${total}</span>
+    <div class="pagination-btns">
+      <button class="pg-btn pg-prev" onclick="changePage('${key}',${current - 1})" ${current === 1 ? "disabled" : ""}>
+        ‹ <span class="pg-label">Prev</span>
+      </button>
+      ${numBtns}
+      <button class="pg-btn pg-next" onclick="changePage('${key}',${current + 1})" ${current === totalPages ? "disabled" : ""}>
+        <span class="pg-label">Next</span> ›
+      </button>
+    </div>`;
 }
 
 function changePage(key, page) {
@@ -2447,6 +2465,509 @@ function refreshFilters() {
         fStu.appendChild(o);
       });
   }
+}
+
+// ═══════════════════════════════════════════════
+//   TIMETABLE MODULE
+// ═══════════════════════════════════════════════
+
+const TT_DAYS  = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const TT_PERIODS = [1,2,3,4,5,6,7,8];
+const TT_DEFAULT_TIMES = {
+  1:"08:00–08:45", 2:"08:45–09:30", 3:"09:45–10:30",
+  4:"10:30–11:15", 5:"11:15–12:00", 6:"13:00–13:45",
+  7:"13:45–14:30", 8:"14:30–15:15"
+};
+// Subject → colour index (consistent colouring)
+const ttSubjectColorMap = {};
+let ttColorCounter = 0;
+let editPeriodId = null;
+
+function ttGetSubjectColor(subject) {
+  if (!(subject in ttSubjectColorMap)) {
+    ttSubjectColorMap[subject] = ttColorCounter % 12;
+    ttColorCounter++;
+  }
+  return ttSubjectColorMap[subject];
+}
+
+// ── DB helpers ──
+function ensureTTTable() {
+  const db = getDB();
+  if (!db.timetable) { db.timetable = []; seedTimetable(db); saveDB(db); }
+  return db;
+}
+
+function seedTimetable(db) {
+  if (!db.teachers || !db.teachers.length || !db.classes || !db.classes.length) return;
+  const workDays = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
+  const subjects = db.subjects || CM_DEFAULT_SUBJECTS;
+  // Seed 3 classes with full week timetables
+  const seedClasses = db.classes.slice(0, 3);
+  seedClasses.forEach((cls, ci) => {
+    workDays.forEach(day => {
+      TT_PERIODS.slice(0, 6).forEach((period, pi) => {
+        if (period === 3 || period === 6) return; // leave gaps for variety
+        const teacher = db.teachers[(ci + pi) % db.teachers.length];
+        const subject = subjects[(ci * 2 + pi) % subjects.length];
+        const startH  = 8 + Math.floor(pi * 0.75);
+        const startM  = (pi % 2) * 45;
+        const endH    = startH + (startM + 45 >= 60 ? 1 : 0);
+        const endM    = (startM + 45) % 60;
+        const fmt = h => String(h).padStart(2,"0");
+        db.timetable.push({
+          id: uid(), class: cls, day, period,
+          subject, teacherId: teacher.id,
+          teacherName: `${teacher.firstName} ${teacher.lastName}`,
+          startTime: `${fmt(startH)}:${fmt(startM)}`,
+          endTime:   `${fmt(endH)}:${fmt(endM)}`,
+          room: `Room ${100 + ci * 10 + pi}`
+        });
+      });
+    });
+  });
+}
+
+// ── Init ──
+function initTimetable() {
+  ensureTTTable();
+  populateTTViewSelect();
+  populateTTModalDropdowns();
+}
+
+function populateTTViewSelect() {
+  const db  = ensureTTTable();
+  const sel = document.getElementById("tt-view-select");
+  if (!sel) return;
+  while (sel.options.length > 1) sel.remove(1);
+  const role = currentUser?.role;
+
+  if (role === "student") {
+    // Student sees only their own class
+    const cls = currentUser.class;
+    if (cls) {
+      const o = document.createElement("option");
+      o.value = `class:${cls}`; o.textContent = cls;
+      sel.appendChild(o);
+      sel.value = `class:${cls}`;
+    }
+  } else if (role === "teacher") {
+    // Teacher sees only timetable entries where they teach
+    const myClasses = [...new Set(
+      (db.timetable||[]).filter(p => p.teacherId === currentUser.id).map(p => p.class)
+    )];
+    // Also add "My Full Schedule" option
+    const o0 = document.createElement("option");
+    o0.value = `teacher:${currentUser.id}`; o0.textContent = "📋 My Full Schedule";
+    sel.appendChild(o0);
+    myClasses.forEach(cls => {
+      const o = document.createElement("option");
+      o.value = `class:${cls}`; o.textContent = cls;
+      sel.appendChild(o);
+    });
+    sel.value = `teacher:${currentUser.id}`;
+  } else {
+    // Admin sees all classes + all teachers
+    const og1 = document.createElement("optgroup"); og1.label = "── By Class";
+    (db.classes||[]).forEach(cls => {
+      const o = document.createElement("option");
+      o.value = `class:${cls}`; o.textContent = cls;
+      og1.appendChild(o);
+    });
+    sel.appendChild(og1);
+    const og2 = document.createElement("optgroup"); og2.label = "── By Teacher";
+    (db.teachers||[]).forEach(t => {
+      const o = document.createElement("option");
+      o.value = `teacher:${t.id}`; o.textContent = `${t.firstName} ${t.lastName}`;
+      og2.appendChild(o);
+    });
+    sel.appendChild(og2);
+  }
+}
+
+function populateTTModalDropdowns() {
+  const db = ensureTTTable();
+  // Classes
+  const clsSel = document.getElementById("tt-class");
+  if (clsSel) {
+    while (clsSel.options.length > 1) clsSel.remove(1);
+    (db.classes||[]).forEach(c => {
+      const o=document.createElement("option"); o.value=c; o.textContent=c; clsSel.appendChild(o);
+    });
+  }
+  // Subjects
+  const subSel = document.getElementById("tt-subject");
+  if (subSel) {
+    while (subSel.options.length > 1) subSel.remove(1);
+    (db.subjects||CM_DEFAULT_SUBJECTS).forEach(s => {
+      const o=document.createElement("option"); o.value=s; o.textContent=s; subSel.appendChild(o);
+    });
+  }
+  // Teachers
+  const tchSel = document.getElementById("tt-teacher");
+  if (tchSel) {
+    while (tchSel.options.length > 1) tchSel.remove(1);
+    (db.teachers||[]).forEach(t => {
+      const o=document.createElement("option");
+      o.value=t.id; o.textContent=`${t.firstName} ${t.lastName} (${t.subject})`;
+      tchSel.appendChild(o);
+    });
+  }
+}
+
+// ── Render page ──
+function renderTimetablePage() {
+  const db   = ensureTTTable();
+  const role = currentUser?.role;
+  const sel  = document.getElementById("tt-view-select");
+  const val  = sel?.value || "";
+  const isAdmin = role === "admin";
+
+  // Show/hide add button and import button
+  const addBtn    = document.getElementById("btn-tt-add");
+  const importBtn = document.getElementById("btn-tt-import");
+  if (addBtn)    addBtn.style.display    = isAdmin ? "" : "none";
+  if (importBtn) importBtn.style.display = isAdmin ? "" : "none";
+
+  // Update subtitle
+  const sub = document.getElementById("tt-subtitle");
+  if (sub) {
+    if      (role === "student") sub.textContent = `Your timetable for ${currentUser.class||"your class"}`;
+    else if (role === "teacher") sub.textContent = "Your teaching schedule for the week";
+    else                         sub.textContent  = "Edit and manage class timetables";
+  }
+
+  // If student, auto-select their class
+  if (role === "student" && currentUser.class && !val) {
+    if (sel) sel.value = `class:${currentUser.class}`;
+  }
+
+  const selected = sel?.value || "";
+  if (!selected) {
+    document.getElementById("tt-grid-container").innerHTML = `
+      <div class="tt-empty">
+        <div class="tt-empty-icon">📅</div>
+        <h3>${role==="admin"?"Select a class or teacher to view / edit":"Loading your timetable…"}</h3>
+        <p>Use the dropdown above</p>
+      </div>`;
+    document.getElementById("tt-legend").innerHTML = "";
+    return;
+  }
+
+  // Determine which days to show
+  const today   = new Date().getDay(); // 0=Sun, 1=Mon…
+  const todayName = TT_DAYS[today - 1] || "";
+  let periods = [];
+  let viewLabel = "";
+
+  if (selected.startsWith("class:")) {
+    const cls = selected.replace("class:","");
+    periods   = (db.timetable||[]).filter(p => p.class === cls);
+    viewLabel = cls;
+  } else if (selected.startsWith("teacher:")) {
+    const tid = selected.replace("teacher:","");
+    periods   = (db.timetable||[]).filter(p => p.teacherId === tid);
+    const t   = (db.teachers||[]).find(x => x.id === tid);
+    viewLabel = t ? `${t.firstName} ${t.lastName}` : "Teacher";
+  }
+
+  // Which days actually have periods?
+  const daysWithData = TT_DAYS.filter(d => periods.some(p => p.day === d));
+  const showDays = daysWithData.length ? daysWithData : TT_DAYS.slice(0,5);
+
+  // Which periods are used?
+  const usedPeriods = [...new Set(periods.map(p=>p.period))].sort((a,b)=>a-b);
+  const showPeriods = usedPeriods.length ? usedPeriods : TT_PERIODS.slice(0,6);
+
+  // Build subject→color map
+  [...new Set(periods.map(p=>p.subject))].forEach(s => ttGetSubjectColor(s));
+
+  // Render legend
+  const legendEl = document.getElementById("tt-legend");
+  const subjects  = [...new Set(periods.map(p=>p.subject))];
+  legendEl.innerHTML = subjects.map(s => {
+    const ci = ttGetSubjectColor(s);
+    return `<div class="tt-legend-item">
+      <div class="tt-legend-dot tt-color-${ci}" style="background:var(--tt-dot-${ci})"></div>
+      ${cmEsc(s)}
+    </div>`;
+  }).join("") + (isAdmin ? `<span style="font-size:11px;color:var(--text3);margin-left:auto;">Click any cell to add or edit a period</span>` : "");
+
+  // Info banner
+  let infoBar = "";
+  if (!isAdmin) {
+    const totalPeriods = periods.length;
+    const todayPeriods = periods.filter(p=>p.day===todayName).length;
+    infoBar = `<div class="tt-info-bar">📅 ${viewLabel} · ${totalPeriods} periods/week${todayName&&todayPeriods?` · ${todayPeriods} periods today (${todayName})`:""}</div>`;
+  }
+
+  // Build grid HTML
+  const cols = showDays.length;
+  let gridHTML = `<div class="tt-scroll">
+    <div class="tt-grid" style="--tt-cols:${cols}">`;
+
+  // Header row
+  gridHTML += `<div class="tt-header-cell">Period</div>`;
+  showDays.forEach(day => {
+    const isToday = day === todayName;
+    gridHTML += `<div class="tt-header-cell ${isToday?"today":""}">${day.slice(0,3)}${isToday?" ●":""}</div>`;
+  });
+
+  // Period rows
+  showPeriods.forEach(period => {
+    const timeLabel = TT_DEFAULT_TIMES[period] || `P${period}`;
+    gridHTML += `<div class="tt-time-cell">${timeLabel}</div>`;
+    showDays.forEach(day => {
+      const entry = periods.find(p => p.day===day && p.period===period);
+      if (entry) {
+        const ci = ttGetSubjectColor(entry.subject);
+        const editBtnHTML = isAdmin
+          ? `<button class="tt-edit-btn" onclick="event.stopPropagation();openTTModal('${entry.id}')" title="Edit">✏</button>`
+          : "";
+        gridHTML += `<div class="tt-cell">
+          <div class="tt-period-card tt-color-${ci}" onclick="${isAdmin?`openTTModal('${entry.id}')`:""}" style="${isAdmin?"cursor:pointer":"cursor:default"}">
+            ${editBtnHTML}
+            <div class="tt-period-name">${cmEsc(entry.subject)}</div>
+            <div class="tt-period-teacher">👤 ${cmEsc(entry.teacherName||"")}</div>
+            <div class="tt-period-time">🕐 ${entry.startTime}–${entry.endTime}</div>
+            ${entry.room?`<div class="tt-period-room">📍 ${cmEsc(entry.room)}</div>`:""}
+          </div>
+        </div>`;
+      } else {
+        // Empty cell — admin can click to add
+        gridHTML += `<div class="tt-cell tt-cell-empty" onclick="${isAdmin?`openTTModal(null,'${day}',${period})`:""}"></div>`;
+      }
+    });
+  });
+
+  gridHTML += `</div></div>`;
+  document.getElementById("tt-grid-container").innerHTML = infoBar + gridHTML;
+}
+
+// ── Modal ──
+function openTTModal(id, preDay, prePeriod) {
+  if (currentUser?.role !== "admin") return;
+  editPeriodId = id || null;
+  document.getElementById("tt-modal-title").textContent = id ? "Edit Period" : "Add Period";
+  document.getElementById("tt-delete-btn").style.display = id ? "" : "none";
+  // Clear errors
+  ["tt-start-err","tt-end-err","tt-class-err","tt-subject-err","tt-teacher-err"].forEach(eid => {
+    const e=document.getElementById(eid); if(e) e.textContent="";
+  });
+
+  if (id) {
+    const db = ensureTTTable();
+    const p  = (db.timetable||[]).find(x=>x.id===id);
+    if (!p) return;
+    document.getElementById("tt-day").value     = p.day;
+    document.getElementById("tt-period").value  = p.period;
+    document.getElementById("tt-start").value   = p.startTime;
+    document.getElementById("tt-end").value     = p.endTime;
+    document.getElementById("tt-class").value   = p.class;
+    document.getElementById("tt-subject").value = p.subject;
+    document.getElementById("tt-teacher").value = p.teacherId;
+    document.getElementById("tt-room").value    = p.room||"";
+  } else {
+    // Pre-fill from clicked cell context
+    if (preDay)    document.getElementById("tt-day").value    = preDay;
+    if (prePeriod) document.getElementById("tt-period").value = prePeriod;
+    // Auto-fill time from period
+    const period  = prePeriod || 1;
+    const times   = TT_DEFAULT_TIMES[period]?.split("–") || ["08:00","08:45"];
+    document.getElementById("tt-start").value   = times[0]||"08:00";
+    document.getElementById("tt-end").value     = times[1]||"08:45";
+    document.getElementById("tt-class").value   = "";
+    document.getElementById("tt-subject").value = "";
+    document.getElementById("tt-teacher").value = "";
+    document.getElementById("tt-room").value    = "";
+    // Pre-select class from view dropdown
+    const sel = document.getElementById("tt-view-select");
+    if (sel?.value?.startsWith("class:")) {
+      document.getElementById("tt-class").value = sel.value.replace("class:","");
+    }
+  }
+  openModal("tt-modal");
+}
+
+function savePeriod() {
+  if (currentUser?.role !== "admin") return;
+  const start   = document.getElementById("tt-start").value;
+  const end     = document.getElementById("tt-end").value;
+  const cls     = document.getElementById("tt-class").value;
+  const subject = document.getElementById("tt-subject").value;
+  const teacher = document.getElementById("tt-teacher").value;
+  let valid = true;
+  if (!start)   { document.getElementById("tt-start-err").textContent   = "Required"; valid=false; }
+  if (!end)     { document.getElementById("tt-end-err").textContent     = "Required"; valid=false; }
+  if (!cls)     { document.getElementById("tt-class-err").textContent   = "Required"; valid=false; }
+  if (!subject) { document.getElementById("tt-subject-err").textContent = "Required"; valid=false; }
+  if (!teacher) { document.getElementById("tt-teacher-err").textContent = "Required"; valid=false; }
+  if (!valid) return;
+  if (start >= end) { document.getElementById("tt-end-err").textContent = "Must be after start time"; return; }
+
+  const db = ensureTTTable();
+  const teacherObj = (db.teachers||[]).find(t=>t.id===teacher);
+  const data = {
+    day:         document.getElementById("tt-day").value,
+    period:      parseInt(document.getElementById("tt-period").value),
+    startTime:   start, endTime: end,
+    class:       cls, subject,
+    teacherId:   teacher,
+    teacherName: teacherObj ? `${teacherObj.firstName} ${teacherObj.lastName}` : "",
+    room:        document.getElementById("tt-room").value.trim()
+  };
+
+  if (editPeriodId) {
+    const idx = (db.timetable||[]).findIndex(p=>p.id===editPeriodId);
+    if (idx>-1) db.timetable[idx] = { ...db.timetable[idx], ...data };
+    showToast("Period updated","success");
+  } else {
+    // Check for conflict (same class + day + period)
+    const conflict = (db.timetable||[]).find(p => p.class===cls && p.day===data.day && p.period===data.period);
+    if (conflict) { document.getElementById("tt-class-err").textContent = "A period already exists for this class/day/period"; return; }
+    db.timetable = db.timetable||[];
+    db.timetable.push({ id:uid(), ...data });
+    showToast("Period added","success");
+  }
+  saveDB(db);
+  closeModal("tt-modal");
+  renderTimetablePage();
+}
+
+function deletePeriod() {
+  if (!editPeriodId || currentUser?.role !== "admin") return;
+  showConfirm("Delete this period from the timetable?", () => {
+    const db = ensureTTTable();
+    db.timetable = (db.timetable||[]).filter(p=>p.id!==editPeriodId);
+    saveDB(db);
+    closeModal("tt-modal");
+    renderTimetablePage();
+    showToast("Period deleted","info");
+  });
+}
+
+// ── Bulk Import ──
+function openTTImportModal() {
+  if (currentUser?.role !== "admin") return;
+  const db = ensureTTTable();
+
+  // Populate class dropdown
+  const clsSel = document.getElementById("tt-import-class");
+  while (clsSel.options.length > 1) clsSel.remove(1);
+  (db.classes||[]).forEach(c => {
+    const o=document.createElement("option"); o.value=c; o.textContent=c; clsSel.appendChild(o);
+  });
+  // Pre-select from view dropdown if a class is selected
+  const viewSel = document.getElementById("tt-view-select");
+  if (viewSel?.value?.startsWith("class:")) {
+    clsSel.value = viewSel.value.replace("class:","");
+  }
+
+  // Populate teacher dropdown
+  const tchSel = document.getElementById("tt-import-teacher");
+  while (tchSel.options.length > 1) tchSel.remove(1);
+  (db.teachers||[]).forEach(t => {
+    const o=document.createElement("option"); o.value=t.id;
+    o.textContent=`${t.firstName} ${t.lastName} (${t.subject})`; tchSel.appendChild(o);
+  });
+
+  // Clear errors
+  document.getElementById("tt-import-class-err").textContent = "";
+  document.getElementById("tt-import-teacher-err").textContent = "";
+
+  buildImportGrid(db);
+  clsSel.onchange = () => buildImportGrid(db);
+  openModal("tt-import-modal");
+}
+
+function buildImportGrid(db) {
+  const cls = document.getElementById("tt-import-class").value;
+  const existing = cls ? (db.timetable||[]).filter(p=>p.class===cls) : [];
+  const workDays = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const periods  = [1,2,3,4,5,6,7,8];
+  const subjects = (db.subjects||CM_DEFAULT_SUBJECTS);
+
+  let html = "";
+  workDays.forEach(day => {
+    html += `<div style="background:var(--bg3);border-radius:10px;padding:12px;border:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">${day}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;">`;
+    periods.forEach(p => {
+      const existing_period = existing.find(e=>e.day===day&&e.period===p);
+      const timeDefault = TT_DEFAULT_TIMES[p]?.split("–")||["08:00","08:45"];
+      const subjectVal  = existing_period?.subject || "";
+      html += `<div style="background:var(--bg2);border-radius:7px;padding:8px 10px;border:1px solid var(--border);">
+        <div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:6px;">P${p} · ${timeDefault[0]||""}–${timeDefault[1]||""}</div>
+        <select style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:4px 6px;color:var(--text);font-size:11px;" id="imp-${day}-${p}">
+          <option value="">— Free —</option>
+          ${subjects.map(s=>`<option value="${s}" ${subjectVal===s?"selected":""}>${s}</option>`).join("")}
+        </select>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+  document.getElementById("tt-import-grid").innerHTML = html;
+}
+
+function saveBulkTimetable() {
+  if (currentUser?.role !== "admin") return;
+  const cls     = document.getElementById("tt-import-class").value;
+  const teacher = document.getElementById("tt-import-teacher").value;
+  let valid = true;
+  if (!cls)     { document.getElementById("tt-import-class-err").textContent   = "Required"; valid=false; }
+  if (!teacher) { document.getElementById("tt-import-teacher-err").textContent = "Required"; valid=false; }
+  if (!valid) return;
+
+  const db = ensureTTTable();
+  const teacherObj = (db.teachers||[]).find(t=>t.id===teacher);
+  const workDays   = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const periods    = [1,2,3,4,5,6,7,8];
+
+  // Remove all existing periods for this class
+  db.timetable = (db.timetable||[]).filter(p=>p.class!==cls);
+
+  let added = 0;
+  workDays.forEach(day => {
+    periods.forEach(p => {
+      const sel = document.getElementById(`imp-${day}-${p}`);
+      if (!sel || !sel.value) return; // Free period — skip
+      const times = TT_DEFAULT_TIMES[p]?.split("–") || ["08:00","08:45"];
+      db.timetable.push({
+        id: uid(), class: cls, day, period: p,
+        subject: sel.value,
+        teacherId:   teacher,
+        teacherName: teacherObj ? `${teacherObj.firstName} ${teacherObj.lastName}` : "",
+        startTime: times[0]||"08:00",
+        endTime:   times[1]||"08:45",
+        room: ""
+      });
+      added++;
+    });
+  });
+
+  saveDB(db);
+  closeModal("tt-import-modal");
+  // Switch view to the imported class
+  const viewSel = document.getElementById("tt-view-select");
+  if (viewSel) viewSel.value = `class:${cls}`;
+  renderTimetablePage();
+  showToast(`✓ Timetable saved — ${added} periods added for ${cls}`, "success");
+  logActivity(`Full timetable set for ${cls} (${added} periods)`, "var(--teal)");
+}
+
+function clearClassTimetable() {
+  const cls = document.getElementById("tt-import-class").value;
+  if (!cls) { showToast("Select a class first","error"); return; }
+  showConfirm(`Clear the entire timetable for ${cls}? All periods will be removed.`, () => {
+    const db = ensureTTTable();
+    const before = (db.timetable||[]).length;
+    db.timetable = (db.timetable||[]).filter(p=>p.class!==cls);
+    saveDB(db);
+    closeModal("tt-import-modal");
+    const viewSel = document.getElementById("tt-view-select");
+    if (viewSel?.value === `class:${cls}`) renderTimetablePage();
+    showToast(`Timetable cleared for ${cls}`, "info");
+  });
 }
 
 // Redraw charts on resize
